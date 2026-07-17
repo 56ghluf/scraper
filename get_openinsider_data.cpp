@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
 #include <thread>
 
 #include <cpr/cpr.h>
