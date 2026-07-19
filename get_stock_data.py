@@ -45,9 +45,9 @@ for start_date, tickers in groups.items():
     count += 1
     print(f'progres: {count}/{total} [{count/total*100:.1f}%]')
 
-    if count - last_pause > 199:
+    if count - last_pause > 499:
         last_pause = count
-        sleep(30)
+        sleep(180)
 
 
 delta = time() - start
