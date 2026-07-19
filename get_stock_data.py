@@ -15,7 +15,7 @@ def custom_str_to_float(x):
     except (TypeError, ValueError):
         print(f'FATAL -- custom_str_to_float: could not convert {x} to float')
 
-openinsider_data = pd.read_csv('openinsider_data.csv', delimiter='\x1F', dtype={'Ticker': 'string'}, converters={'1w': custom_str_to_float, '1m': custom_str_to_float, '6m': custom_str_to_float}).tail(20)
+openinsider_data = pd.read_csv('openinsider_data.csv', delimiter='\x1F', dtype={'Ticker': 'string'}, converters={'1w': custom_str_to_float, '1m': custom_str_to_float, '6m': custom_str_to_float})
 
 openinsider_data = openinsider_data.dropna(subset=['Ticker'])
 openinsider_data['Ticker'] = openinsider_data['Ticker'].str.strip()
