@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import yfinance as yf
 
-def str_to_float(x):
+def custom_str_to_float(x):
     if (x == ''):
         return float('nan')
     if (x == '>999'):
@@ -11,16 +11,18 @@ def str_to_float(x):
     try:
         return float(x)
     except (TypeError, ValueError):
-        print(f'FATAL -- str_to_float: could not convert {x} to float')
+        print(f'FATAL -- custom_str_to_float: could not convert {x} to float')
 
-openinsider_data = pd.read_csv('openinsider_data.csv', delimiter='\x1F', converters={'1w': str_to_float, '1m': str_to_float, '6m': str_to_float})
+openinsider_data = pd.read_csv('openinsider_data.csv', delimiter='\x1F', dtype={'Ticker': 'string'}, converters={'1w': custom_str_to_float, '1m': custom_str_to_float, '6m': custom_str_to_float}).head(2)
+
+openinsider_data = openinsider_data.dropna(subset=['Ticker'])
+openinsider_data['Ticker'] = openinsider_data['Ticker'].str.strip()
 
 # ticker = 'JEF'
 # start_date = '2026-07-14'
 # end_date = '2026-07-17'
 
 # stock_data = yf.download(ticker, start=start_date, end=end_date, progress=True)
-
 
 def get_following_min_max_price(row):
     # very important to use THIS string
@@ -32,18 +34,13 @@ def get_following_min_max_price(row):
     end_date = (end_date + timedelta(10)).strftime('%Y-%m-%d')
 
     ticker = row['Ticker']
-    if (type(ticker) == float):
-        print(row)
-    elif (len(ticker) > 5):
-        print(ticker, ' ', [f'U+{ord(c):04X}' for c in ticker])
+
+    stock_data = yf.download(ticker, start=start_date, end=end_date, progress=True)
+    print(stock_data)
 
     # print(f'{start_date} {end_date} {ticker}')
 
     return pd.Series({'following_10_day_max': 0, 'following_10_day_min': 0})
 
 
-# openinsider_data[['following_10_day_max', 'following_10_day_min']] = openinsider_data.apply(get_following_min_max_price, axis=1)
-
-# for el in openinsider_data.head(500)['6m']:
-    # print(el)
-
+openinsider_data[['following_10_day_max', 'following_10_day_min']] = openinsider_data.apply(get_following_min_max_price, axis=1)
