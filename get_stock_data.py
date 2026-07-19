@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from time import time, sleep
-from random import random
 
 import pandas as pd
 import numpy as np
@@ -37,6 +36,7 @@ start = time()
 stock_data = {}
 
 count = 0
+last_pause = 0
 total = len(groups)
 
 for start_date, tickers in groups.items():
@@ -44,8 +44,11 @@ for start_date, tickers in groups.items():
 
     count += 1
     print(f'progres: {count}/{total} [{count/total*100:.1f}%]')
-    
-    sleep(0.5*(3 + random()))
+
+    if count - last_pause > 299:
+        last_pause = count
+        sleep(30)
+
 
 delta = time() - start
 
