@@ -64,7 +64,6 @@ def get_following_min_max_price(row):
 
 openinsider_data[['following_10_day_max', 'following_10_day_min']] = openinsider_data.apply(get_following_min_max_price, axis=1)
 
-print(openinsider_data.info())
 openinsider_data.to_csv('insider_trading_data.csv', sep='\x1F', index=False)
 
 print('finished processing stock data and wrote to disk')
