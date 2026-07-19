@@ -20,7 +20,7 @@ def custom_str_to_float(x):
     except (TypeError, ValueError):
         print(f'FATAL -- custom_str_to_float: could not convert {x} to float')
 
-openinsider_data = pd.read_csv('openinsider_data.csv', delimiter='\x1F', dtype={'Ticker': 'string'}, converters={'1w': custom_str_to_float, '1m': custom_str_to_float, '6m': custom_str_to_float}).head(100)
+openinsider_data = pd.read_csv('openinsider_data.csv', delimiter='\x1F', dtype={'Ticker': 'string'}, converters={'1w': custom_str_to_float, '1m': custom_str_to_float, '6m': custom_str_to_float})
 
 openinsider_data = openinsider_data.dropna(subset=['Ticker'])
 openinsider_data['Ticker'] = openinsider_data['Ticker'].str.strip()
@@ -30,7 +30,7 @@ groups = openinsider_data.groupby(TRADE_DATE_COL)['Ticker'].unique()
 def get_end_date(start_date):
     return (datetime.strptime(start_date, '%Y-%m-%d') + timedelta(11)).strftime('%Y-%m-%d')
 
-print('Retrieving stock data...\n')
+print('retrieving stock data...\n')
 start = time()
 
 stock_data = {}
@@ -42,7 +42,7 @@ for start_date, tickers in groups.items():
     stock_data[start_date] = yf.download(list(tickers), start=start_date, end=get_end_date(start_date), group_by='ticker', progress=False, auto_adjust=False)
 
     count += 1
-    print(f'\rProgres: {count/total*100:.1f}%', end='', flush=True)
+    print(f'\rprogres: {count/total*100:.1f}%', end='', flush=True)
 
 delta = time() - start
 
@@ -66,3 +66,5 @@ openinsider_data[['following_10_day_max', 'following_10_day_min']] = openinsider
 
 print(openinsider_data.info())
 openinsider_data.to_csv('insider_trading_data.csv', sep='\x1F', index=False)
+
+print('finished processing stock data and wrote to disk')
