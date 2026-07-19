@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
-from time import time
+from time import time, sleep
+from random import random
 
 import pandas as pd
 import numpy as np
@@ -42,7 +43,9 @@ for start_date, tickers in groups.items():
     stock_data[start_date] = yf.download(list(tickers), start=start_date, end=get_end_date(start_date), group_by='ticker', progress=False, auto_adjust=False)
 
     count += 1
-    print(f'\rprogres: {count/total*100:.1f}%', end='', flush=True)
+    print(f'progres: {count}/{total} [{count/total*100:.1f}%]')
+    
+    sleep(0.5*(3 + random()))
 
 delta = time() - start
 
