@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta
-from time import time
+from time import time, sleep
+from random import random
 
 import pandas as pd
 import numpy as np
 import yfinance as yf
+from yfinance.exceptions import YFRateLimitError
 
 # very important to use THIS string
 # it has a non-breaking space (U+00A0)
@@ -39,7 +41,16 @@ count = 0
 total = len(groups)
 
 for start_date, tickers in groups.items():
-    stock_data[start_date] = yf.download(list(tickers), start=start_date, end=get_end_date(start_date), group_by='ticker', progress=False, auto_adjust=False)
+    i = 0
+    while i < 10:
+        try:
+            stock_data[start_date] = yf.download(list(tickers), start=start_date, end=get_end_date(start_date), group_by='ticker', progress=False, auto_adjust=False, threads=False)
+            break
+        except YFRateLimitError:
+            wait_time = 2**i + 4 * random()
+            print(f'hit rate limit, retrying in {wait_time} seconds')
+            sleep(wait_time)
+            i += 1
 
     count += 1
     print(f'\rprogres: {count/total*100:.1f}%', end='', flush=True)
