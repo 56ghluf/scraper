@@ -47,7 +47,9 @@ for start_date, tickers in groups.items():
 
     if count - last_pause > 499:
         last_pause = count
-        sleep(180)
+        print('pausing execution to avoid rate limit...')
+        sleep(600)
+        print('resuming')
 
 
 delta = time() - start
