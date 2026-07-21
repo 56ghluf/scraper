@@ -117,7 +117,7 @@ for start_date, tickers in groups.items():
 
         if rate_limit_handler:
             print(f'\nattempt {retry_attempt+1} hit rate limit')
-            sleep_with_progress(60*2**retry_attempt + 600 * random())
+            sleep_with_progress(60*2**retry_attempt + 1200 * random())
             retry_attempt += 1
             continue
 
