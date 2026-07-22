@@ -1,11 +1,10 @@
 from datetime import datetime, timedelta
 from time import time, sleep
-import logging
 from random import random
 
 import pandas as pd
-import numpy as np
 import yfinance as yf
+from curl_cffi.requests.exceptions import HTTPError, Timeout
 
 
 # === Very simple logging utils ===
@@ -15,6 +14,10 @@ def print_debug(msg):
 
 def print_err(err):
     print('[ERROR]:', err)
+
+
+def print_sep(sep='=', count=50):
+    print(count*sep)
 
 
 # === Loading the openinsider.com dataset ===
@@ -42,12 +45,14 @@ openinsider_data = pd.read_csv('openinsider_data.csv',
                                    '1w': custom_str_to_float,
                                    '1m': custom_str_to_float,
                                    '6m': custom_str_to_float
-                               })
+                               }, nrows=200)
 
 openinsider_data = openinsider_data.dropna(subset=['Ticker'])
 openinsider_data['Ticker'] = openinsider_data['Ticker'].str.strip()
 
-groups = openinsider_data.groupby(TRADE_DATE_COL)['Ticker'].unique()
+print(f'initial df is of size {len(openinsider_data)}')
+
+groups = openinsider_data.groupby('Ticker')[TRADE_DATE_COL].unique()
 
 
 # === Download the necessary stock data ===
@@ -70,23 +75,6 @@ def sleep_with_progress(dt):
     print()
 
 
-class RateLimitHandler(logging.Handler):
-    def __init__(self):
-        super().__init__()
-
-        self.caught_rate_limit_error = False
-
-    def emit(self, record):
-        if 'YFRateLimitError' in record.getMessage():
-            self.caught_rate_limit_error = True
-
-    def reset(self):
-        self.caught_rate_limit_error = False
-
-    def __bool__(self):
-        return self.caught_rate_limit_error
-
-
 print_debug('retrieving stock data...\n')
 start = time()
 
@@ -96,38 +84,60 @@ count = 0
 last_pause = 0
 total = len(groups)
 
-logger = logging.getLogger('yfinance')
-rate_limit_handler = RateLimitHandler()
-logger.addHandler(rate_limit_handler)
+tickers_to_remove = set()
 
-for start_date, tickers in groups.items():
-    retry_attempt = 0
+for ticker, dates in groups.items():
+    start_date = dates.min()
+    end_date = get_end_date(dates.max())
 
+    yf.config.debug.hide_exceptions = False
+
+    retries = 0
     while True:
-        rate_limit_handler.reset()
+        try:
+            data = yf.Ticker(ticker).history(
+                start=start_date,
+                end=end_date,
+                auto_adjust=False,
+            )
+            stock_data[ticker] = data
+            break
 
-        result = yf.download(
-            list(tickers),
-            start=start_date,
-            end=get_end_date(start_date),
-            group_by='ticker',
-            progress=False,
-            auto_adjust=False
-        )
+        except (
+            yf.exceptions.YFPricesMissingError,
+            yf.exceptions.YFTzMissingError,
 
-        if rate_limit_handler:
-            print(f'\nattempt {retry_attempt+1} hit rate limit')
-            sleep_with_progress(60*2**retry_attempt + 1200 * random())
-            retry_attempt += 1
-            continue
+        ):
+            tickers_to_remove.add(ticker)
+            break
 
-        stock_data[start_date] = result
-        break
+        except HTTPError as e:
+            if e.response is not None and e.response.status_code == 404:
+                tickers_to_remove.add(ticker)
+                break
+
+            raise
+
+        except (yf.exceptions.YFRateLimitError, Timeout) as e:
+            retries += 1
+
+            if retries > 10:
+                tickers_to_remove.add(ticker)
+                break
+
+            if retries == 1:
+                print(
+                    f'\ngot {e.__class__.__name__} error'
+                    ', starting backoff strategy'
+                )
+
+            print(f'attempt number {retries}')
+
+            sleep_with_progress(30*2**retries + random() * 120)
 
     count += 1
     print(f'\rprogress: {count}/{total} [{count/total*100:.1f}%]',
           end='', flush=True)
-
 
 delta = time() - start
 
@@ -136,27 +146,55 @@ print_debug(('finished retrieving stock data in '
              f'{int((delta % 3600) // 60)} '
              f'minutes, {delta % 60:.2f} seconds'))
 
+openinsider_data = (
+    openinsider_data[~openinsider_data['Ticker'].isin(tickers_to_remove)]
+)
+
+print(
+    'df length after removing '
+    f'non-existent stock data: {len(openinsider_data)}'
+)
+
 
 # === Add the downloaded stock data to the dataset ===
 def get_following_min_max_price(row):
-    date = row[TRADE_DATE_COL]
     ticker = row['Ticker']
+    close_prices = stock_data[ticker]['Close']
+    date = pd.Timestamp(row[TRADE_DATE_COL], tz=close_prices.index.tz)
 
-    curr_stock_data = stock_data[date][ticker]
+    date_index = close_prices.index.searchsorted(date)
+    delta = (close_prices.index[date_index] - date).days
+    start_date_index = date_index + 2 - min(delta, 2)
 
-    if curr_stock_data.empty:
+    if start_date_index >= len(close_prices):
         return pd.Series({
-            'following_10_day_max': np.nan,
-            'following_10_day_min': np.nan}, dtype='float64')
+            'following_10_day_max': float('nan'),
+            'following_10_day_min': float('nan')
+        })
 
-    close_prices = curr_stock_data['Close']
-    base = close_prices.iloc[0]
+    base = close_prices.iloc[date_index]
+    relevant_prices = close_prices.iloc[start_date_index:start_date_index+10]
 
-    return pd.Series({'following_10_day_max': close_prices.iloc[2:].max() / base, 'following_10_day_min': close_prices.iloc[2:].min() / base})
+    return pd.Series({
+        'following_10_day_max': relevant_prices.max() / base,
+        'following_10_day_min': relevant_prices.min() / base
+    })
 
 
-openinsider_data[['following_10_day_max', 'following_10_day_min']
-                 ] = openinsider_data.apply(get_following_min_max_price, axis=1)
+following_min_max = openinsider_data.apply(get_following_min_max_price, axis=1)
+mask = following_min_max['following_10_day_max'].notna()
+
+openinsider_data[
+    ['following_10_day_max', 'following_10_day_min']
+] = following_min_max
+openinsider_data = openinsider_data[mask]
+
+print(
+    'df length after removing '
+    f'insufficient stock data: {len(openinsider_data)}'
+)
+
+print(openinsider_data)
 
 openinsider_data.to_csv('insider_trading_data.csv', sep='\x1F', index=False)
 
