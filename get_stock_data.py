@@ -52,8 +52,6 @@ openinsider_data['Ticker'] = openinsider_data['Ticker'].str.strip()
 
 print(f'initial df is of size {len(openinsider_data)}')
 
-groups = openinsider_data.groupby('Ticker')[TRADE_DATE_COL].unique()
-
 
 # === Download the necessary stock data ===
 def get_end_date(start_date):
@@ -67,84 +65,93 @@ def sleep_with_progress(dt):
     curr = 0
 
     while curr < dt:
-        print(f'\rpaused, {int(curr)}s of {
-              int(dt)}s [{100*curr/dt:.1f}%]', end='', flush=True)
         sleep(0.2)
         curr = time() - start
+        print(f'\rpaused, {int(curr)}s of {
+              int(dt)}s [{100*curr/dt:.1f}%]', end='', flush=True)
 
     print()
 
 
-print_debug('retrieving stock data...')
-start = time()
+def add_stock_data(stock_data, tickers_to_remove, groups):
+    print_debug('retrieving stock data...')
+    start = time()
 
-stock_data = {}
+    count = 0
+    total = len(groups)
 
-count = 0
-last_pause = 0
-total = len(groups)
+    for ticker, dates in groups.items():
+        start_date = dates.min()
+        end_date = get_end_date(dates.max())
 
-tickers_to_remove = set()
+        yf.config.debug.hide_exceptions = False
 
-for ticker, dates in groups.items():
-    start_date = dates.min()
-    end_date = get_end_date(dates.max())
-
-    yf.config.debug.hide_exceptions = False
-
-    retries = 0
-    while True:
-        try:
-            data = yf.Ticker(ticker).history(
-                start=start_date,
-                end=end_date,
-                auto_adjust=False,
-            )
-            stock_data[ticker] = data
-            break
-
-        except (
-            yf.exceptions.YFPricesMissingError,
-            yf.exceptions.YFTzMissingError,
-
-        ):
-            tickers_to_remove.add(ticker)
-            break
-
-        except HTTPError as e:
-            if e.response is not None and e.response.status_code == 404:
-                tickers_to_remove.add(ticker)
-                break
-
-            raise
-
-        except (yf.exceptions.YFRateLimitError, Timeout) as e:
-            retries += 1
-
-            if retries > 10:
-                tickers_to_remove.add(ticker)
-                break
-
-            if retries == 1:
-                print(
-                    f'\ngot {e.__class__.__name__} error'
-                    ', starting backoff strategy'
+        retries = 0
+        while True:
+            try:
+                data = yf.Ticker(ticker).history(
+                    start=start_date,
+                    end=end_date,
+                    auto_adjust=False,
                 )
+                stock_data[ticker] = data
+                break
 
-            print(f'attempt number {retries}')
+            except (
+                yf.exceptions.YFPricesMissingError,
+                yf.exceptions.YFTzMissingError,
 
-            sleep_with_progress(30*2**retries + random() * 120)
+            ):
+                tickers_to_remove.add(ticker)
+                break
 
-    count += 1
-    print(f'\rprogress: {count}/{total} [{count/total*100:.1f}%]',
-          end='', flush=True)
+            except HTTPError as e:
+                if e.response is not None and e.response.status_code == 404:
+                    tickers_to_remove.add(ticker)
+                    break
 
-delta = time() - start
+                raise
 
-print_debug(('finished retrieving stock data in '
-             f'{int(delta // 3600)} hours, '
-             f'{int((delta % 3600) // 60)} '
-             f'minutes, {delta % 60:.2f} seconds'))
+            except (yf.exceptions.YFRateLimitError, Timeout) as e:
+                retries += 1
+
+                if retries > 10:
+                    tickers_to_remove.add(ticker)
+                    break
+
+                if retries == 1:
+                    print(
+                        f'\ngot {e.__class__.__name__} error'
+                        ', starting backoff strategy'
+                    )
+
+                print(f'attempt number {retries}')
+
+                sleep_with_progress(7.5*2**retries + random() * 30)
+
+        count += 1
+        print(f'\rprogress: {count}/{total} [{count/total*100:.1f}%]',
+              end='', flush=True)
+
+    delta = time() - start
+
+    print_debug(('finished retrieving stock data in '
+                 f'{int(delta // 3600)} hours, '
+                 f'{int((delta % 3600) // 60)} '
+                 f'minutes, {delta % 60:.2f} seconds'))
+
+
+chunk_size = 5000
+stock_data = {}
+tickers_to_remove = set()
+for start in range(0, len(openinsider_data), chunk_size):
+    print(f'retrieving data for slice {start}:{start+chunk_size}')
+    groups = (
+        openinsider_data.iloc[start:start+chunk_size]
+        .groupby('Ticker')[TRADE_DATE_COL]
+        .unique()
+    )
+    add_stock_data(stock_data, tickers_to_remove, groups)
 
 openinsider_data = (
     openinsider_data[~openinsider_data['Ticker'].isin(tickers_to_remove)]
