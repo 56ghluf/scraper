@@ -138,10 +138,10 @@ def add_stock_data(stock_data, tickers_to_remove, groups):
 
     delta = time() - start
 
-    print_debug(('finished retrieving stock data in '
-                 f'{int(delta // 3600)} hours, '
-                 f'{int((delta % 3600) // 60)} '
-                 f'minutes, {delta % 60:.2f} seconds'))
+    print('\nfinished retrieving stock data in '
+          f'{int(delta // 3600)} hours, '
+          f'{int((delta % 3600) // 60)} '
+          f'minutes, {delta % 60:.2f} seconds')
 
 
 chunk_size = 5000
