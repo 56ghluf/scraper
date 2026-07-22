@@ -45,7 +45,7 @@ openinsider_data = pd.read_csv('openinsider_data.csv',
                                    '1w': custom_str_to_float,
                                    '1m': custom_str_to_float,
                                    '6m': custom_str_to_float
-                               }, nrows=200)
+                               })
 
 openinsider_data = openinsider_data.dropna(subset=['Ticker'])
 openinsider_data['Ticker'] = openinsider_data['Ticker'].str.strip()
@@ -75,7 +75,7 @@ def sleep_with_progress(dt):
     print()
 
 
-print_debug('retrieving stock data...\n')
+print_debug('retrieving stock data...')
 start = time()
 
 stock_data = {}
