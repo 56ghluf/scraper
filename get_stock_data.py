@@ -210,6 +210,13 @@ def get_following_min_max_price(row):
     date = pd.Timestamp(row[TRADE_DATE_COL], tz=close_prices.index.tz)
 
     date_index = close_prices.index.searchsorted(date)
+
+    if date_index >= len(close_prices):
+        return pd.Series({
+            'following_10_day_max': float('nan'),
+            'following_10_day_min': float('nan')
+        })
+
     delta = (close_prices.index[date_index] - date).days
     start_date_index = date_index + 2 - min(delta, 2)
 
