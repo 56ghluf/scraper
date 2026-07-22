@@ -173,6 +173,7 @@ for count, (ticker, dates) in enumerate(groups.items()):
         except Exception as e:
             print(f'\nsomething weird happend for {ticker}:')
             print(e)
+            break
 
     print(
         (f'\rprogress: {count+1}/{len(groups)} '
