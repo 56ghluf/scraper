@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from time import time, sleep
 from random import random
+from collections import defaultdict
 
 import pandas as pd
 import yfinance as yf
@@ -73,109 +74,118 @@ def sleep_with_progress(dt):
     print()
 
 
-def add_stock_data(stock_data, tickers_to_remove, groups):
-    print_debug('retrieving stock data...')
-    start = time()
+def add_stock_data(stock_chunks, tickers_to_remove, ticker, dates):
+    start_date = dates.min()
+    end_date = get_end_date(dates.max())
 
-    count = 0
-    total = len(groups)
+    yf.config.debug.hide_exceptions = False
 
-    for ticker, dates in groups.items():
-        start_date = dates.min()
-        end_date = get_end_date(dates.max())
+    retries = 0
+    while True:
+        try:
+            data = yf.Ticker(ticker).history(
+                start=start_date,
+                end=end_date,
+                auto_adjust=False,
+            )
+            stock_chunks[ticker].append(data)
+            break
 
-        yf.config.debug.hide_exceptions = False
+        except (
+            yf.exceptions.YFPricesMissingError,
+            yf.exceptions.YFTzMissingError,
 
-        retries = 0
-        while True:
-            try:
-                data = yf.Ticker(ticker).history(
-                    start=start_date,
-                    end=end_date,
-                    auto_adjust=False,
-                )
-                stock_data[ticker] = data
-                break
+        ):
+            tickers_to_remove.add(ticker)
+            break
 
-            except (
-                yf.exceptions.YFPricesMissingError,
-                yf.exceptions.YFTzMissingError,
-
-            ):
+        except HTTPError as e:
+            if e.response is not None and e.response.status_code == 404:
                 tickers_to_remove.add(ticker)
                 break
 
-            except HTTPError as e:
-                if e.response is not None and e.response.status_code == 404:
-                    tickers_to_remove.add(ticker)
-                    break
-
-                raise
-
-            except yf.exceptions.YFRateLimitError:
-                retries += 1
-
-                if retries > 10:
-                    tickers_to_remove.add(ticker)
-                    break
-
-                if retries == 1:
-                    print('\nrate limit error, starting backoff strategy')
-
-                print(f'attempt number {retries}')
-
-                sleep_with_progress(7.5*2**retries + random() * 30)
-
-            except Timeout:
-                delay = 0.1 + 0.1*random()
-                print(f'\nrequest timed out, retrying in {delay:.2f}s')
-                sleep(delay)
-
-        count += 1
-        print(f'\rprogress: {count}/{total} [{count/total*100:.1f}%]',
-              end='', flush=True)
-        sleep(0.01)
-
-    delta = time() - start
-
-    print('\nfinished retrieving stock data in '
-          f'{int(delta // 3600)} hours, '
-          f'{int((delta % 3600) // 60)} '
-          f'minutes, {delta % 60:.2f} seconds')
-
-
-stock_data = {}
-tickers_to_remove = set()
-
-DEFAULT_CHUNK_SIZE = 20000
-chunk_size = DEFAULT_CHUNK_SIZE
-chunk_start = 0
-
-while chunk_start < len(openinsider_data):
-    try:
-        print(
-            f'retrieving data for slice {chunk_start}:{chunk_start+chunk_size}'
-        )
-        groups = (
-            openinsider_data.iloc[chunk_start:chunk_start+chunk_size]
-            .groupby('Ticker')[TRADE_DATE_COL]
-            .unique()
-        )
-        add_stock_data(stock_data, tickers_to_remove, groups)
-
-        chunk_start += chunk_size
-        chunk_size = DEFAULT_CHUNK_SIZE
-
-    except KeyError as e:
-        if e.args[0] == 'chart':
-            print('failed because chunk size was too big, reducing chunk size')
-            chunk_size = chunk_size // 2
-            if chunk_size < 1:
-                chunk_size = 1
-        else:
             raise
 
+        except yf.exceptions.YFRateLimitError:
+            retries += 1
 
+            if retries > 10:
+                tickers_to_remove.add(ticker)
+                break
+
+            if retries == 1:
+                print('\nrate limit error, starting backoff strategy')
+
+            print(f'attempt number {retries}')
+
+            sleep_with_progress(7.5*2**retries + random() * 30)
+
+        except Timeout:
+            delay = 0.1 + 0.1*random()
+            print(f'\nrequest timed out, retrying in {delay:.2f}s')
+            sleep(delay)
+
+
+groups = (
+    openinsider_data
+    .sort_values(TRADE_DATE_COL)
+    .groupby('Ticker')[TRADE_DATE_COL]
+    .unique()
+)
+
+print_debug('retrieving stock data...')
+start_time = time()
+
+stock_chunks = defaultdict(list)
+tickers_to_remove = set()
+
+for count, (ticker, dates) in enumerate(groups.items()):
+    start = 0
+    chunk_size = len(dates)
+
+    if chunk_size == 0:
+        continue
+
+    while True:
+        try:
+            for i in range(start, len(dates), chunk_size):
+                start = i
+                add_stock_data(
+                    stock_chunks, tickers_to_remove,
+                    ticker, dates[i:i+chunk_size]
+                )
+                sleep(0.01)
+            break
+
+        except KeyError as e:
+            if e.args[0] == 'chart':
+                print(f'\nchunk_size too large for {ticker}, reducing it')
+
+                chunk_size = chunk_size // 2
+
+                if chunk_size < 1:
+                    chunk_size = 1
+            else:
+                raise
+
+    print(
+        (f'\rprogress: {count+1}/{len(groups)} '
+         f'[{(count+1)/len(groups)*100:.1f}%]'),
+        end='', flush=True
+    )
+
+stock_data = {
+    ticker: pd.concat(chunks).sort_index()
+    for ticker, chunks in stock_chunks.items()
+}
+
+time_delta = time() - start_time
+print('\nfinished retrieving stock data in '
+      f'{int(time_delta // 3600)} hours, '
+      f'{int((time_delta % 3600) // 60)} '
+      f'minutes, {time_delta % 60:.2f} seconds')
+
+# === Remove stocks with no data ===
 openinsider_data = (
     openinsider_data[~openinsider_data['Ticker'].isin(tickers_to_remove)]
 )
@@ -223,8 +233,6 @@ print(
     'df length after removing '
     f'insufficient stock data: {len(openinsider_data)}'
 )
-
-print(openinsider_data)
 
 openinsider_data.to_csv('insider_trading_data.csv', sep='\x1F', index=False)
 
