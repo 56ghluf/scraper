@@ -159,12 +159,14 @@ for count, (ticker, dates) in enumerate(groups.items()):
 
         except KeyError as e:
             if e.args[0] == 'chart':
-                print(f'\nchunk_size too large for {ticker}, reducing it')
+                print(f'\nchunk_size {chunk_size} too large for {ticker}, reducing it')
 
                 chunk_size = chunk_size // 2
 
                 if chunk_size < 1:
-                    chunk_size = 1
+                    print(f'couldn\'t find small enough chunk_size for {ticker}')
+                    tickers_to_remove.add(ticker)
+                    break
             else:
                 raise
 
