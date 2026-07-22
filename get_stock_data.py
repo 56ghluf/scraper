@@ -147,7 +147,8 @@ def add_stock_data(stock_data, tickers_to_remove, groups):
 stock_data = {}
 tickers_to_remove = set()
 
-chunk_size = len(openinsider_data)
+DEFAULT_CHUNK_SIZE = 20000
+chunk_size = DEFAULT_CHUNK_SIZE
 chunk_start = 0
 
 while chunk_start < len(openinsider_data):
@@ -163,7 +164,7 @@ while chunk_start < len(openinsider_data):
         add_stock_data(stock_data, tickers_to_remove, groups)
 
         chunk_start += chunk_size
-        chunk_size = len(openinsider_data) - chunk_start
+        chunk_size = DEFAULT_CHUNK_SIZE
 
     except KeyError as e:
         if e.args[0] == 'chart':
