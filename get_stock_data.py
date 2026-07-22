@@ -144,17 +144,36 @@ def add_stock_data(stock_data, tickers_to_remove, groups):
           f'minutes, {delta % 60:.2f} seconds')
 
 
-chunk_size = 5000
 stock_data = {}
 tickers_to_remove = set()
-for start in range(0, len(openinsider_data), chunk_size):
-    print(f'retrieving data for slice {start}:{start+chunk_size}')
-    groups = (
-        openinsider_data.iloc[start:start+chunk_size]
-        .groupby('Ticker')[TRADE_DATE_COL]
-        .unique()
-    )
-    add_stock_data(stock_data, tickers_to_remove, groups)
+
+chunk_size = len(openinsider_data)
+chunk_start = 0
+
+while chunk_start < len(openinsider_data):
+    try:
+        print(
+            f'retrieving data for slice {chunk_start}:{chunk_start+chunk_size}'
+        )
+        groups = (
+            openinsider_data.iloc[chunk_start:chunk_start+chunk_size]
+            .groupby('Ticker')[TRADE_DATE_COL]
+            .unique()
+        )
+        add_stock_data(stock_data, tickers_to_remove, groups)
+
+        chunk_start += chunk_size
+        chunk_size = len(openinsider_data) - chunk_start
+
+    except KeyError as e:
+        if e.args[0] == 'chart':
+            print('failed because chunk size was too big, reducing chunk size')
+            chunk_size = chunk_size // 2
+            if chunk_size < 1:
+                chunk_size = 1
+        else:
+            raise
+
 
 openinsider_data = (
     openinsider_data[~openinsider_data['Ticker'].isin(tickers_to_remove)]
