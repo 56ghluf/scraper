@@ -112,7 +112,7 @@ def add_stock_data(stock_data, tickers_to_remove, groups):
 
                 raise
 
-            except (yf.exceptions.YFRateLimitError, Timeout) as e:
+            except yf.exceptions.YFRateLimitError:
                 retries += 1
 
                 if retries > 10:
@@ -120,18 +120,21 @@ def add_stock_data(stock_data, tickers_to_remove, groups):
                     break
 
                 if retries == 1:
-                    print(
-                        f'\ngot {e.__class__.__name__} error'
-                        ', starting backoff strategy'
-                    )
+                    print('\nrate limit error, starting backoff strategy')
 
                 print(f'attempt number {retries}')
 
                 sleep_with_progress(7.5*2**retries + random() * 30)
 
+            except Timeout:
+                delay = 0.1 + 0.1*random()
+                print(f'\nrequest timed out, retrying in {delay:.2f}s')
+                sleep(delay)
+
         count += 1
         print(f'\rprogress: {count}/{total} [{count/total*100:.1f}%]',
               end='', flush=True)
+        sleep(0.01)
 
     delta = time() - start
 
