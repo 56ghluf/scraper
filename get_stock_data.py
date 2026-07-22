@@ -170,6 +170,10 @@ for count, (ticker, dates) in enumerate(groups.items()):
             else:
                 raise
 
+        except Exception as e:
+            print(f'\nsomething weird happend for {ticker}:')
+            print(e)
+
     print(
         (f'\rprogress: {count+1}/{len(groups)} '
          f'[{(count+1)/len(groups)*100:.1f}%]'),
