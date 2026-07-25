@@ -3,6 +3,7 @@
 #include <chrono>
 #include <ostream>
 #include <string>
+#include <utility>
 
 namespace chr = std::chrono;
 
@@ -33,3 +34,5 @@ std::ostream &operator<<(std::ostream &, const DateInterval &);
 
 std::string date_to_string(const chr::year_month_day &,
                            const std::string & = "%2F");
+
+std::pair<std::string, std::string> curr_dates(chr::days = chr::days{1});

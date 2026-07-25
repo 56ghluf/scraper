@@ -44,11 +44,17 @@ FetchContent_MakeAvailable(cpr lexbor)
 
 ################################################################
 
-# project
+# === project ===
+# executables
 add_executable(get_openinsider_data get_openinsider_data.cpp)
 target_compile_options(get_openinsider_data PRIVATE ${PROJECT_WARNING_FLAGS})
-target_link_libraries(get_openinsider_data cpr lexbor_static dates search_result_parsing timing)
+target_link_libraries(get_openinsider_data cpr dates search_result_parsing timing)
 
+add_executable(get_current_openinsider_data get_current_openinsider_data.cpp)
+target_compile_options(get_current_openinsider_data PRIVATE ${PROJECT_WARNING_FLAGS})
+target_link_libraries(get_current_openinsider_data cpr dates search_result_parsing)
+
+# libraries
 add_library(dates dates.cpp)
 target_include_directories(dates PUBLIC ${PROJECT_SOURCE_DIR})
 target_compile_options(dates PRIVATE ${PROJECT_WARNING_FLAGS})
@@ -61,9 +67,4 @@ target_link_libraries(search_result_parsing lexbor_static)
 add_library(timing timing.cpp)
 target_include_directories(timing PUBLIC ${PROJECT_SOURCE_DIR})
 target_compile_options(timing PRIVATE ${PROJECT_WARNING_FLAGS})
-
-#add_library(engine engine.cpp particles.cpp obstacles.cpp receiver_agent.cpp dust.cpp comet.cpp bouncer.cpp sources.cpp)
-#target_include_directories(engine PUBLIC ${PROJECT_SOURCE_DIR}/engine)
-#target_compile_options(engine PRIVATE ${PROJECT_WARNING_FLAGS})
-#target_link_libraries(engine project_options math_utils drawing logging_utils)
 

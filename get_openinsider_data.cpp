@@ -18,7 +18,7 @@ int main() {
     return EXIT_FAILURE;
   }
 
-  std::string base_url{
+  const std::string base_url{
       "http://openinsider.com/"
       "screener?s=&o=&pl=&ph=&ll=&lh=&fd=0&fdr=&td=-1&tdr={}+-+{}"
       "&fdlyl=&fdlyh=&daysago=&xp=1&xs=1&vl=&vh=&ocl=&och=&sic1=-1&"

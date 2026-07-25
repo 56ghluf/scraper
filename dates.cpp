@@ -4,13 +4,13 @@
 #include <format>
 #include <ostream>
 #include <string>
+#include <utility>
 
 DateInterval::DateInterval(const chr::year_month_day &start,
                            const chr::days &delta)
     : interval_start_{start},
       interval_end_{chr::sys_days{start} + delta - chr::days{1}}, delta_{delta},
-      end_date_{std::chrono::floor<std::chrono::days>(
-          std::chrono::system_clock::now())} {};
+      end_date_{chr::floor<chr::days>(chr::system_clock::now())} {};
 
 // No resets for dates, as designed to be used in a for loop once
 DateInterval::operator bool() {
@@ -49,4 +49,12 @@ std::string date_to_string(const chr::year_month_day &date,
   return std::format("{:02}{}{:02}{}{:04}", static_cast<unsigned>(date.month()),
                      sep, static_cast<unsigned>(date.day()), sep,
                      static_cast<int>(date.year()));
+}
+
+std::pair<std::string, std::string> curr_dates(chr::days offset) {
+  const chr::sys_days today{chr::floor<chr::days>(chr::system_clock::now())};
+  return {
+    date_to_string(chr::year_month_day{today - offset}),
+    date_to_string(chr::year_month_day{today})
+  };
 }
