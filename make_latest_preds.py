@@ -1,5 +1,6 @@
 from os import listdir
 import requests
+from datetime import datetime, date
 
 import pandas as pd
 from joblib import load
@@ -77,6 +78,12 @@ request_data = ''
 matches = []
 
 for row in new_data.to_dict('records'):
+    if (
+        date.today() -
+        datetime.strptime(row[dlus.TRADE_DATE_COL], '%Y-%m-%d').date()
+    ).days > 2:
+        continue
+
     match = {}
 
     for model_name in model_names:
@@ -119,7 +126,9 @@ for match in matches:
 
     request_data += '\n'
 
-requests.post(
-    'https://ntfy.sh/bDoZa0LEbwHCE0br',
-    data=request_data
-)
+if request_data != '':
+    request_data = 45*'-' + '\n\n' + request_data + '\n' + 45*'-'
+    requests.post(
+        'https://ntfy.sh/bDoZa0LEbwHCE0br',
+        data=request_data
+    )
