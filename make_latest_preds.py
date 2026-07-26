@@ -1,4 +1,5 @@
 from os import listdir
+import requests
 
 import pandas as pd
 from joblib import load
@@ -43,6 +44,8 @@ new_data['numeric_trade_dates'] = (
     new_data[dlus.TRADE_DATE_COL].apply(dlus.date_str_to_numeric)
 )
 
+new_data = new_data.drop_duplicates()
+
 try:
     old_preds = pd.read_csv('curr_data/preds.csv', delimiter='\x1F')
 
@@ -57,12 +60,68 @@ try:
 except FileNotFoundError:
     old_preds = None
 
+model_names = []
+
 if not new_data.empty:
-    for model_filename in listdir('models')[:2]:
+    for model_filename in listdir('models')[:3]:
         model = load(f'models/{model_filename}')
         preds = model.predict(new_data.drop(columns=dlus.TRADE_DATE_COL))
-        new_data[model_filename[:-7]] = model.predict(new_data)
+        model_name = model_filename[:-7]
+        model_names.append(model_name)
+        new_data[model_name] = model.predict(new_data)
 
 (
     pd.concat([old_preds, new_data], ignore_index=True)
 ).to_csv('curr_data/preds.csv', sep='\x1F', index=False)
+
+request_data = ''
+
+matches = []
+
+for row in new_data.to_dict('records'):
+    match = {}
+
+    for model_name in model_names:
+        if row[model_name]:
+            if not match:
+                match['trade_date'] = row[dlus.TRADE_DATE_COL]
+                match['ticker'] = row['Ticker']
+
+            for model_type in ['gain', 'loss']:
+                if model_type in model_name:
+                    key = model_type + '_matches'
+                    if key in match:
+                        match[key].append(model_name)
+                    else:
+                        match[key] = [model_name]
+                break
+            else:
+                print(
+                    'fatal: there neither gain '
+                    f'nor loss in model_name: {model_name}'
+                )
+
+    if match:
+        matches.append(match)
+
+for match in matches:
+    request_data += '=== ' + \
+        match['trade_date'] + ' ' + match['ticker'] + ' ===\n'
+
+    prev_key = None
+    for key in ['gain_matches', 'loss_matches']:
+        if key in match:
+            if prev_key:
+                request_data += '\n'
+
+            for model_name in sorted(match[key]):
+                request_data += model_name + '\n'
+
+        prev_key = key
+
+    request_data += '\n'
+
+requests.post(
+    'https://ntfy.sh/bDoZa0LEbwHCE0br',
+    data=request_data
+)
