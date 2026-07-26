@@ -1,6 +1,7 @@
 *.csv
 *.joblib
 TODO.txt
+logs
 
 # C++
 ##### Windows
