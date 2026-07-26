@@ -3,6 +3,8 @@ name = "scraper"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
+    "joblib>=1.5.3",
     "pandas>=3.0.3",
+    "scikit-learn==1.6.1",
     "yfinance>=1.5.1",
 ]

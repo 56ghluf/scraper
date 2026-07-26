@@ -7,6 +7,8 @@ import pandas as pd
 import yfinance as yf
 from curl_cffi.requests.exceptions import HTTPError, Timeout
 
+import data_loading_utils
+
 
 # === Very simple logging utils ===
 def print_debug(msg):
@@ -22,30 +24,12 @@ def print_sep(sep='=', count=50):
 
 
 # === Loading the openinsider.com dataset ===
-# very important to use THIS string
-# it has a non-breaking space (U+00A0)
-# why does openinsider.com use one? I have no idea
-TRADE_DATE_COL = 'Trade Date'
-
-
-def custom_str_to_float(x):
-    if x == '':
-        return float('nan')
-    if x == '>999':
-        return 1000
-    try:
-        return float(x)
-    except (TypeError, ValueError) as e:
-        print_err(f'custom_str_to_float: could not convert {x} to float')
-        raise e
-
-
 openinsider_data = pd.read_csv('openinsider_data.csv',
                                delimiter='\x1F', dtype={'Ticker': 'string'},
                                converters={
-                                   '1w': custom_str_to_float,
-                                   '1m': custom_str_to_float,
-                                   '6m': custom_str_to_float
+                                   '1w': data_loading_utils.custom_str_to_float,
+                                   '1m': data_loading_utils.custom_str_to_float,
+                                   '6m': data_loading_utils.custom_str_to_float
                                })
 
 openinsider_data = openinsider_data.dropna(subset=['Ticker'])
@@ -128,8 +112,8 @@ def add_stock_data(stock_chunks, tickers_to_remove, ticker, dates):
 
 groups = (
     openinsider_data
-    .sort_values(TRADE_DATE_COL)
-    .groupby('Ticker')[TRADE_DATE_COL]
+    .sort_values(data_loading_utils.TRADE_DATE_COL)
+    .groupby('Ticker')[data_loading_utils.TRADE_DATE_COL]
     .unique()
 )
 
@@ -208,7 +192,7 @@ print(
 def get_following_min_max_price(row):
     ticker = row['Ticker']
     close_prices = stock_data[ticker]['Close']
-    date = pd.Timestamp(row[TRADE_DATE_COL], tz=close_prices.index.tz)
+    date = pd.Timestamp(row[data_loading_utils.TRADE_DATE_COL], tz=close_prices.index.tz)
 
     date_index = close_prices.index.searchsorted(date)
 
