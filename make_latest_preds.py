@@ -44,8 +44,6 @@ new_data['numeric_trade_dates'] = (
     new_data[dlus.TRADE_DATE_COL].apply(dlus.date_str_to_numeric)
 )
 
-new_data = new_data.drop_duplicates()
-
 try:
     old_preds = pd.read_csv('curr_data/preds.csv', delimiter='\x1F')
 
@@ -63,7 +61,7 @@ except FileNotFoundError:
 model_names = []
 
 if not new_data.empty:
-    for model_filename in listdir('models')[:3]:
+    for model_filename in listdir('models'):
         model = load(f'models/{model_filename}')
         preds = model.predict(new_data.drop(columns=dlus.TRADE_DATE_COL))
         model_name = model_filename[:-7]
