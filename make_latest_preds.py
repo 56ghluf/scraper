@@ -99,7 +99,7 @@ for row in new_data.to_dict('records'):
                         match[key].append(model_name)
                     else:
                         match[key] = [model_name]
-                break
+                    break
             else:
                 print(
                     'fatal: there neither gain '
@@ -122,12 +122,12 @@ for match in matches:
             for model_name in sorted(match[key]):
                 request_data += model_name + '\n'
 
-        prev_key = key
+            prev_key = key
 
     request_data += '\n'
 
 if request_data != '':
-    request_data = 45*'-' + '\n\n' + request_data + '\n' + 45*'-'
+    request_data = 44*'-' + '\n\n' + request_data + '\n' + 44*'-'
     requests.post(
         'https://ntfy.sh/bDoZa0LEbwHCE0br',
         data=request_data
