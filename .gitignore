@@ -2,6 +2,7 @@
 *.joblib
 TODO.txt
 logs
+*.key
 
 # C++
 ##### Windows
