@@ -1,12 +1,11 @@
 from os import listdir
 import requests
-from datetime import datetime, date
+import datetime
 
 import pandas as pd
 from joblib import load
 
 import data_loading_utils as dlus
-
 
 try:
     new_data = pd.read_csv('curr_data/raw_data.csv',
@@ -73,21 +72,24 @@ if not new_data.empty:
     pd.concat([old_preds, new_data], ignore_index=True)
 ).to_csv('curr_data/preds.csv', sep='\x1F', index=False)
 
+###########################################################################
+
 request_data = ''
 
 matches = []
 
+
 for row in new_data.to_dict('records'):
     if (
-        date.today() -
-        datetime.strptime(row[dlus.TRADE_DATE_COL], '%Y-%m-%d').date()
+        datetime.date.today() -
+        datetime.datetime.strptime(row[dlus.TRADE_DATE_COL], '%Y-%m-%d').date()
     ).days > 2:
         continue
 
     match = {}
 
     for model_name in model_names:
-        if row[model_name]:
+        if row[model_name] and not pd.isna(row[model_name]):
             if not match:
                 match['trade_date'] = row[dlus.TRADE_DATE_COL]
                 match['ticker'] = row['Ticker']

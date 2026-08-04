@@ -1,4 +1,4 @@
-from datetime import date
+import json
 
 # annoying column name constants
 FILING_DATE_COL = 'Filing\xA0Date'
@@ -46,5 +46,17 @@ def date_str_to_numeric(date_str):
     return 31*(int(date_str[5:7])-1) + int(date_str[8:10])
 
 
-def date_str_delta(str1, str2):
-    return (date.fromisoformat(str2[:10]) - date.fromisoformat(str1[:10])).days
+# load a file content as str
+def file_to_str(filename):
+    with open(filename, 'r', encoding='utf-8') as f:
+        return f.read()
+
+
+def load_json(filename):
+    with open(filename, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+
+def write_json(data, filename):
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
