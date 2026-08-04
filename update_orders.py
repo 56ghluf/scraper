@@ -13,10 +13,11 @@ from alpaca.trading.enums import OrderSide, TimeInForce, OrderClass
 from alpaca.trading.requests import (
     LimitOrderRequest, TakeProfitRequest, StopLossRequest
 )
+from alpaca.common.exceptions import APIError
 
 import data_loading_utils as dlus
 
-saved_state = dlus.load_json('order_data.json')
+saved_state = dlus.load_json('curr_data/order_data.json')
 
 index = saved_state['index']
 ongoing_orders = saved_state['ongoing_orders']
@@ -64,6 +65,7 @@ def trade_too_old(date_str):
 
 
 for row in new_data.to_dict('records'):
+    index += 1
     if trade_too_old(row[dlus.TRADE_DATE_COL]):
         continue
 
@@ -71,7 +73,7 @@ for row in new_data.to_dict('records'):
     max_loss = -1
 
     for model_name in model_names:
-        if not row[model_name]:
+        if not row[model_name] or pd.isna(row[model_name]):
             continue
 
         threshold = int(re.search(r'thld(\d+)', model_name).group(1))
@@ -107,8 +109,6 @@ for row in new_data.to_dict('records'):
         row[dlus.TRADE_DATE_COL]
     )
 
-    index += 1
-
 ALPACA_KEY = dlus.file_to_str('alpaca-key.key').strip()
 ALPACA_SECRET = dlus.file_to_str('alpaca-secret.key').strip()
 
@@ -130,7 +130,7 @@ MAX_ORDER_CAPITAL = 5000
 
 
 def print_and_send_error_notification(err_msg):
-    err_msg += '===== ERR_MSG =====\n'
+    err_msg = '===== ERR_MSG =====\n' + err_msg
     print(err_msg)
     requests.post(
         'https://ntfy.sh/bDoZa0LEbwHCE0br',
@@ -197,8 +197,12 @@ for ticker in list(orders.keys()):
 
     qty = int(MAX_ORDER_CAPITAL / bid)
 
+    if qty == 0:
+        orders[ticker]
+        continue
+
     try:
-        order = trading_client.submit_order(
+        alpaca_order = trading_client.submit_order(
             LimitOrderRequest(
                 symbol=ticker,
                 qty=qty,
@@ -214,20 +218,31 @@ for ticker in list(orders.keys()):
                 )
             )
         )
+    except APIError as e:
+        if e.code == 40310000:
+            break
+        else:
+            print_and_send_error_notification(
+                'something went wrong when submitting the order: '
+                f'{traceback.format_exc()}'
+            )
+
     except Exception:
         print_and_send_error_notification(
             'something went wrong when submitting the order: '
             f'{traceback.format_exc()}'
         )
 
-    del orders[ticker]
-
     if ticker not in ongoing_orders:
         ongoing_orders[ticker] = {'info': [], side: order['take_stop_side'][2]}
 
     ongoing_orders[ticker]['info'].append([
-        order['date'], take_profit, order.id
+        order['date'], take_profit, str(alpaca_order.id)
     ])
 
+    del orders[ticker]
+
 dlus.write_json(
-    {'index': index, 'ongoing_orders': ongoing_orders, 'orders': orders})
+    {'index': index, 'ongoing_orders': ongoing_orders, 'orders': orders},
+    'curr_data/order_data.json'
+)
