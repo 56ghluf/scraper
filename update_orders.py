@@ -226,12 +226,16 @@ for ticker in list(orders.keys()):
                 'something went wrong when submitting the order: '
                 f'{traceback.format_exc()}'
             )
+            del orders[ticker]
+            continue
 
     except Exception:
         print_and_send_error_notification(
             'something went wrong when submitting the order: '
             f'{traceback.format_exc()}'
         )
+        del orders[ticker]
+        continue
 
     if ticker not in ongoing_orders:
         ongoing_orders[ticker] = {'info': [], side: order['take_stop_side'][2]}
