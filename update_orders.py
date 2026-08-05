@@ -3,15 +3,16 @@ from os import listdir
 import re
 import requests
 import traceback
+import uuid
 
 import pandas as pd
 from alpaca.trading.client import TradingClient
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
-from alpaca.trading.enums import OrderSide, TimeInForce, OrderClass
+from alpaca.trading.enums import OrderSide, TimeInForce, OrderClass, OrderStatus
 from alpaca.trading.requests import (
-    LimitOrderRequest, TakeProfitRequest, StopLossRequest
+    LimitOrderRequest, TakeProfitRequest, StopLossRequest, StockLatestQuoteRequest
 )
 from alpaca.common.exceptions import APIError
 
@@ -58,7 +59,7 @@ def trade_too_old(date_str):
     if (
         datetime.date.today() -
         datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-    ).days > 10:
+    ).days > 9:
         return True
 
     return False
@@ -148,6 +149,7 @@ for ticker in list(orders.keys()):
     order = orders[ticker]
 
     if trade_too_old(order['date']):
+        del orders[ticker]
         continue
 
     if ticker in ongoing_orders:
@@ -219,6 +221,7 @@ for ticker in list(orders.keys()):
             )
         )
     except APIError as e:
+        # Insufficient funds error
         if e.code == 40310000:
             break
         else:
@@ -245,6 +248,30 @@ for ticker in list(orders.keys()):
     ])
 
     del orders[ticker]
+
+# for ticker, order in ongoing_orders.items():
+    # remaining_info = []
+
+    # for order_info in order['info']:
+        # updated_order = trading_client.get_order_by_id(
+            # uuid.UUID(order_info[2])
+        # )
+
+        # if updated_order.status == OrderStatus.FILLED:
+            # continue
+
+        # if trade_too_old(order_info[0]):
+            # trading_client.cancel_order_by_id(uuid.UUID(order_info[2]))
+            # continue
+
+        # if not trading_client.clock().is_open:
+            # remaining_info.append[order_info]
+            # continue
+
+        # latest_quote = data_client.get_stock_lateset_quote(
+            # StockLatestQuoteRequest(symbol_or_symbols='ticker')
+        # )
+
 
 dlus.write_json(
     {'index': index, 'ongoing_orders': ongoing_orders, 'orders': orders},
