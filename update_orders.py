@@ -130,7 +130,7 @@ MAX_ORDER_CAPITAL = 5000
 
 
 def print_and_send_error_notification(err_msg):
-    err_msg = '===== ERR_MSG =====\n' + err_msg
+    err_msg = '=== ERR_MSG ===\n' + err_msg
     print(err_msg)
     requests.post(
         'https://ntfy.sh/bDoZa0LEbwHCE0br',
