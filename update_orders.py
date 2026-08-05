@@ -12,8 +12,10 @@ from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.enums import OrderSide, TimeInForce, OrderClass, OrderStatus
 from alpaca.trading.requests import (
-    LimitOrderRequest, TakeProfitRequest, StopLossRequest, StockLatestQuoteRequest
+    LimitOrderRequest, TakeProfitRequest, StopLossRequest
 )
+from alpaca.data.requests import StockLatestQuoteRequest
+
 from alpaca.common.exceptions import APIError
 
 import data_loading_utils as dlus
