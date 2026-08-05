@@ -10,12 +10,13 @@ from alpaca.trading.client import TradingClient
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
-from alpaca.trading.enums import OrderSide, TimeInForce, OrderClass, OrderStatus
+from alpaca.trading.enums import (
+    OrderSide, TimeInForce, OrderClass, OrderStatus
+)
 from alpaca.trading.requests import (
     LimitOrderRequest, TakeProfitRequest, StopLossRequest
 )
 from alpaca.data.requests import StockLatestQuoteRequest
-
 from alpaca.common.exceptions import APIError
 
 import data_loading_utils as dlus
@@ -251,29 +252,44 @@ for ticker in list(orders.keys()):
 
     del orders[ticker]
 
-# for ticker, order in ongoing_orders.items():
-    # remaining_info = []
+for ticker in list(ongoing_orders.keys()):
+    remaining_info = []
 
-    # for order_info in order['info']:
-        # updated_order = trading_client.get_order_by_id(
-            # uuid.UUID(order_info[2])
-        # )
+    bid_price = None
 
-        # if updated_order.status == OrderStatus.FILLED:
-            # continue
+    market_open = trading_client.get_clock().is_open
 
-        # if trade_too_old(order_info[0]):
-            # trading_client.cancel_order_by_id(uuid.UUID(order_info[2]))
-            # continue
+    for order_info in ongoing_orders[ticker]['info']:
+        updated_order = trading_client.get_order_by_id(
+            uuid.UUID(order_info[2])
+        )
 
-        # if not trading_client.clock().is_open:
-            # remaining_info.append[order_info]
-            # continue
+        if updated_order.status == OrderStatus.FILLED:
+            continue
 
-        # latest_quote = data_client.get_stock_lateset_quote(
-            # StockLatestQuoteRequest(symbol_or_symbols='ticker')
-        # )
+        if trade_too_old(order_info[0]):
+            trading_client.cancel_order_by_id(uuid.UUID(order_info[2]))
+            continue
 
+        if not market_open:
+            remaining_info.append(order_info)
+            continue
+
+        if bid_price is None:
+            bid_price = data_client.get_stock_latest_quote(
+                StockLatestQuoteRequest(symbol_or_symbols=ticker)
+            ).bid_price
+
+        if bid_price >= order_info[1]:
+            trading_client.cancel_order_by_id(uuid.UUID(order_info[2]))
+            continue
+
+        remaining_info.append(order_info)
+
+    if len(remaining_info) == 0:
+        del ongoing_orders[ticker]
+    else:
+        ongoing_orders[ticker]['info'] = remaining_info
 
 dlus.write_json(
     {'index': index, 'ongoing_orders': ongoing_orders, 'orders': orders},
