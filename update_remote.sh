@@ -1,12 +1,15 @@
-cd $1
+cd "$1"
 
-git fetch origin prod
+if ! git fetch origin prod > /dev/null 2>&1; then
+  printf "===== Fetch failed [%s] =====\n" "$(date '+%Y-%m-%d %H:%M:%S')"
+  exit 1
+fi
 
 LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse origin/prod)
 
 if [ "$LOCAL" != "$REMOTE" ]; then
-  echo "===== New version detected [$(date '+%Y-%m-%d %H:%M:%S')] ====="
+  printf "===== New version detected [%s] =====\n" "$(date '+%Y-%m-%d %H:%M:%S')"
   git reset --hard origin/prod
 
   cmake --build build
