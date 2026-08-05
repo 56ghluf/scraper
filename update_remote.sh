@@ -12,6 +12,6 @@ if [ "$LOCAL" != "$REMOTE" ]; then
   printf "===== New version detected [%s] =====\n" "$(date '+%Y-%m-%d %H:%M:%S')"
   git reset --hard origin/prod
 
-  cmake --build build
+  "$2" --build build
   chmod +x $0
 fi
