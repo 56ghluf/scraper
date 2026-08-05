@@ -27,6 +27,9 @@ index = saved_state['index']
 ongoing_orders = saved_state['ongoing_orders']
 orders = saved_state['orders']
 
+model_names = [model_filename[:-7] for model_filename in listdir('models')]
+new_data = pd.read_csv('curr_data/preds.csv', delimiter='\x1F').iloc[index:]
+
 
 def add_order(orders, ticker, take_stop_side, date):
     new_order = {'take_stop_side': take_stop_side, 'date': date}
@@ -54,10 +57,6 @@ def add_order(orders, ticker, take_stop_side, date):
     )
 
 
-model_names = [model_filename[:-7] for model_filename in listdir('models')]
-new_data = pd.read_csv('curr_data/preds.csv', delimiter='\x1F').iloc[index:]
-
-
 def trade_too_old(date_str):
     if (
         datetime.date.today() -
@@ -68,6 +67,7 @@ def trade_too_old(date_str):
     return False
 
 
+print('===Create orders from new predictions===')
 for row in new_data.to_dict('records'):
     index += 1
     if trade_too_old(row[dlus.TRADE_DATE_COL]):
@@ -113,6 +113,9 @@ for row in new_data.to_dict('records'):
         row[dlus.TRADE_DATE_COL]
     )
 
+print('===Retrieving new order stock data===')
+print('symbols:', orders.keys())
+
 ALPACA_KEY = dlus.file_to_str('alpaca-key.key').strip()
 ALPACA_SECRET = dlus.file_to_str('alpaca-secret.key').strip()
 
@@ -148,14 +151,24 @@ def normalize_price(price):
     return round(price, 2)
 
 
+print('===Creating new orders===')
+
 for ticker in list(orders.keys()):
+    print(ticker)
+
     order = orders[ticker]
 
     if trade_too_old(order['date']):
+        print(f'Trade too old: {order['date']}')
         del orders[ticker]
         continue
 
     if ticker in ongoing_orders:
+        print(
+            'Order on opposite side. Current',
+            ongoing_orders[ticker]['side'],
+            'new', order['take_stop_side'][2], '\b.'
+        )
         if ongoing_orders[ticker]['side'] != order['take_stop_side'][2]:
             continue
 
@@ -171,6 +184,7 @@ for ticker in list(orders.keys()):
 
     base_idx = data.index.searchsorted(order['date'])
     if base_idx > len(data):
+        print('No market data yet.')
         continue
 
     base = data.iloc[base_idx]['close']
@@ -184,6 +198,7 @@ for ticker in list(orders.keys()):
             not pd.isna(following_closes.min()) and
             following_closes.min() <= take_profit
         ):
+            print('Went under take profit (side sell).')
             del orders[ticker]
             continue
 
@@ -194,6 +209,7 @@ for ticker in list(orders.keys()):
             not pd.isna(following_closes.max()) and
             following_closes.max() >= take_profit
         ):
+            print('Went over take profit (side buy).')
             del orders[ticker]
             continue
 
@@ -203,6 +219,7 @@ for ticker in list(orders.keys()):
     qty = int(MAX_ORDER_CAPITAL / bid)
 
     if qty == 0:
+        print('Bid qty was 0 (order capital too small).')
         orders[ticker]
         continue
 
@@ -226,6 +243,7 @@ for ticker in list(orders.keys()):
     except APIError as e:
         # Insufficient funds error
         if e.code == 40310000:
+            print('Insufficient funds, breaking.')
             break
         else:
             print_and_send_error_notification(
@@ -252,7 +270,10 @@ for ticker in list(orders.keys()):
 
     del orders[ticker]
 
+print('===Removing no longer necessary orders===')
 for ticker in list(ongoing_orders.keys()):
+    print(ticker)
+
     remaining_info = []
 
     bid_price = None
@@ -265,22 +286,26 @@ for ticker in list(ongoing_orders.keys()):
         )
 
         if updated_order.status == OrderStatus.FILLED:
+            print(f'{order_info[2]} filled.')
             continue
 
         if trade_too_old(order_info[0]):
+            print(f'{order_info[2]} too old.')
             trading_client.cancel_order_by_id(uuid.UUID(order_info[2]))
             continue
 
         if not market_open:
+            print(f'{order_info[2]} market is closed.')
             remaining_info.append(order_info)
             continue
 
         if bid_price is None:
             bid_price = data_client.get_stock_latest_quote(
                 StockLatestQuoteRequest(symbol_or_symbols=ticker)
-            ).bid_price
+            )[ticker].bid_price
 
         if bid_price >= order_info[1]:
+            print(f'{order_info[2]} passed over bid price ({bid_price}).')
             trading_client.cancel_order_by_id(uuid.UUID(order_info[2]))
             continue
 
