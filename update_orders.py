@@ -133,7 +133,7 @@ bar_data = data_client.get_stock_bars(bar_request_params).df
 
 trading_client = TradingClient(ALPACA_KEY, ALPACA_SECRET)
 
-MAX_ORDER_CAPITAL = 5000
+MAX_ORDER_CAPITAL = 500
 
 
 def print_and_send_error_notification(err_msg):
@@ -154,22 +154,20 @@ def normalize_price(price):
 print('===Creating new orders===')
 
 for ticker in list(orders.keys()):
-    print(ticker)
-
     order = orders[ticker]
 
     if trade_too_old(order['date']):
-        print(f'Trade too old: {order['date']}')
+        print(f'Trade too old for {ticker}: {order['date']}')
         del orders[ticker]
         continue
 
     if ticker in ongoing_orders:
-        print(
-            'Order on opposite side. Current',
-            ongoing_orders[ticker]['side'],
-            'new', order['take_stop_side'][2], '\b.'
-        )
         if ongoing_orders[ticker]['side'] != order['take_stop_side'][2]:
+            print(
+                f'Order on opposite side for {ticker}. Current',
+                ongoing_orders[ticker]['side'],
+                'new', order['take_stop_side'][2], '\b.'
+            )
             continue
 
     try:
@@ -184,7 +182,7 @@ for ticker in list(orders.keys()):
 
     base_idx = data.index.searchsorted(order['date'])
     if base_idx > len(data):
-        print('No market data yet.')
+        print(f'No market data for {ticker}.')
         continue
 
     base = data.iloc[base_idx]['close']
@@ -198,7 +196,7 @@ for ticker in list(orders.keys()):
             not pd.isna(following_closes.min()) and
             following_closes.min() <= take_profit
         ):
-            print('Went under take profit (side sell).')
+            print(f'Went under take profit (side sell) for {ticker}.')
             del orders[ticker]
             continue
 
@@ -209,7 +207,7 @@ for ticker in list(orders.keys()):
             not pd.isna(following_closes.max()) and
             following_closes.max() >= take_profit
         ):
-            print('Went over take profit (side buy).')
+            print(f'Went over take profit (side buy) for {ticker}.')
             del orders[ticker]
             continue
 
@@ -219,8 +217,8 @@ for ticker in list(orders.keys()):
     qty = int(MAX_ORDER_CAPITAL / bid)
 
     if qty == 0:
-        print('Bid qty was 0 (order capital too small).')
-        orders[ticker]
+        print(f'Bid qty was 0 (order capital too small) for {ticker}.')
+        del orders[ticker]
         continue
 
     try:
@@ -271,14 +269,15 @@ for ticker in list(orders.keys()):
     del orders[ticker]
 
 print('===Removing no longer necessary orders===')
-for ticker in list(ongoing_orders.keys()):
-    print(ticker)
+market_open = trading_client.get_clock().is_open
 
+if not market_open:
+    print('Market is closed.')
+
+for ticker in list(ongoing_orders.keys()):
     remaining_info = []
 
     bid_price = None
-
-    market_open = trading_client.get_clock().is_open
 
     for order_info in ongoing_orders[ticker]['info']:
         updated_order = trading_client.get_order_by_id(
@@ -286,16 +285,15 @@ for ticker in list(ongoing_orders.keys()):
         )
 
         if updated_order.status == OrderStatus.FILLED:
-            print(f'{order_info[2]} filled.')
+            print(f'{order_info[2]} filled for {ticker}.')
             continue
 
         if trade_too_old(order_info[0]):
-            print(f'{order_info[2]} too old.')
+            print(f'{order_info[2]} too old for {ticker}.')
             trading_client.cancel_order_by_id(uuid.UUID(order_info[2]))
             continue
 
         if not market_open:
-            print(f'{order_info[2]} market is closed.')
             remaining_info.append(order_info)
             continue
 
@@ -305,7 +303,10 @@ for ticker in list(ongoing_orders.keys()):
             )[ticker].bid_price
 
         if bid_price >= order_info[1]:
-            print(f'{order_info[2]} passed over bid price ({bid_price}).')
+            print(
+                f'{order_info[2]} passed over '
+                f'bid price ({bid_price}) for {ticker}.'
+            )
             trading_client.cancel_order_by_id(uuid.UUID(order_info[2]))
             continue
 
