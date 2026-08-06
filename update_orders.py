@@ -113,31 +113,9 @@ for row in new_data.to_dict('records'):
         row[dlus.TRADE_DATE_COL]
     )
 
-print('===Retrieving new order stock data===')
-print('symbols:', orders.keys())
-
-ALPACA_KEY = dlus.file_to_str('alpaca-key.key').strip()
-ALPACA_SECRET = dlus.file_to_str('alpaca-secret.key').strip()
-
-data_client = StockHistoricalDataClient(ALPACA_KEY, ALPACA_SECRET)
-
-bar_request_params = StockBarsRequest(
-    symbol_or_symbols=orders.keys(),
-    timeframe=TimeFrame.Day,
-    start=datetime.datetime.strptime(
-        min([order['date'] for order in orders.values()]), '%Y-%m-%d'
-    ),
-)
-
-bar_data = data_client.get_stock_bars(bar_request_params).df
-
-trading_client = TradingClient(ALPACA_KEY, ALPACA_SECRET)
-
-MAX_ORDER_CAPITAL = 500
-
 
 def print_and_send_error_notification(err_msg):
-    err_msg = '=== ERR_MSG ===\n' + err_msg
+    err_msg = '***ERR_MSG***\n' + err_msg
     print(err_msg)
     requests.post(
         'https://ntfy.sh/bDoZa0LEbwHCE0br',
@@ -151,99 +129,127 @@ def normalize_price(price):
     return round(price, 2)
 
 
-print('===Creating new orders===')
+ALPACA_KEY = dlus.file_to_str('alpaca-key.key').strip()
+ALPACA_SECRET = dlus.file_to_str('alpaca-secret.key').strip()
+data_client = StockHistoricalDataClient(ALPACA_KEY, ALPACA_SECRET)
+trading_client = TradingClient(ALPACA_KEY, ALPACA_SECRET)
 
-for ticker in list(orders.keys()):
-    order = orders[ticker]
+if len(orders) > 0:
+    print('===Retrieving new order stock data===')
 
-    if trade_too_old(order['date']):
-        print(f'Trade too old for {ticker}: {order['date']}')
-        del orders[ticker]
-        continue
+    bar_request_params = StockBarsRequest(
+        symbol_or_symbols=orders.keys(),
+        timeframe=TimeFrame.Day,
+        start=datetime.datetime.strptime(
+            min([order['date'] for order in orders.values()]), '%Y-%m-%d'
+        ),
+    )
 
-    if ticker in ongoing_orders:
-        if ongoing_orders[ticker]['side'] != order['take_stop_side'][2]:
-            print(
-                f'Order on opposite side for {ticker}. Current',
-                ongoing_orders[ticker]['side'],
-                'new', order['take_stop_side'][2], '\b.'
+    bar_data = data_client.get_stock_bars(bar_request_params).df
+
+    MAX_ORDER_CAPITAL = 500
+
+    print('===Creating new orders===')
+
+    for ticker in list(orders.keys()):
+        order = orders[ticker]
+
+        if trade_too_old(order['date']):
+            print(f'Trade too old for {ticker}: {order['date']}')
+            del orders[ticker]
+            continue
+
+        if ticker in ongoing_orders:
+            if ongoing_orders[ticker]['side'] != order['take_stop_side'][2]:
+                print(
+                    f'Order on opposite side for {ticker}. Current',
+                    ongoing_orders[ticker]['side'],
+                    'new', order['take_stop_side'][2], '\b.'
+                )
+                continue
+
+        try:
+            data = bar_data.loc[ticker]
+        except KeyError:
+            print_and_send_error_notification(
+                f'failed to get stock data from alpaca for {ticker}:'
+                ' got KeyError'
             )
-            continue
-
-    try:
-        data = bar_data.loc[ticker]
-    except KeyError:
-        print_and_send_error_notification(
-            f'failed to get stock data from alpaca for {ticker}:'
-            ' got KeyError'
-        )
-        del orders[ticker]
-        continue
-
-    base_idx = data.index.searchsorted(order['date'])
-    if base_idx > len(data):
-        print(f'No market data for {ticker}.')
-        continue
-
-    base = data.iloc[base_idx]['close']
-    take_profit = base * order['take_stop_side'][0]
-    stop_loss = base * order['take_stop_side'][1]
-
-    following_closes = data.iloc[base_idx+1:]['close']
-
-    if order['take_stop_side'][2] == 'sell':
-        if (
-            not pd.isna(following_closes.min()) and
-            following_closes.min() <= take_profit
-        ):
-            print(f'Went under take profit (side sell) for {ticker}.')
             del orders[ticker]
             continue
 
-        bid = 0.99 * base
-        side = OrderSide.SELL
-    else:
-        if (
-            not pd.isna(following_closes.max()) and
-            following_closes.max() >= take_profit
-        ):
-            print(f'Went over take profit (side buy) for {ticker}.')
+        base_idx = data.index.searchsorted(order['date'])
+        if base_idx > len(data):
+            print(f'No market data for {ticker}.')
+            continue
+
+        base = data.iloc[base_idx]['close']
+        take_profit = base * order['take_stop_side'][0]
+        stop_loss = base * order['take_stop_side'][1]
+
+        following_closes = data.iloc[base_idx+1:]['close']
+
+        if order['take_stop_side'][2] == 'sell':
+            if (
+                not pd.isna(following_closes.min()) and
+                following_closes.min() <= take_profit
+            ):
+                print(f'Went under take profit (side sell) for {ticker}.')
+                del orders[ticker]
+                continue
+
+            bid = 0.99 * base
+            side = OrderSide.SELL
+        else:
+            if (
+                not pd.isna(following_closes.max()) and
+                following_closes.max() >= take_profit
+            ):
+                print(f'Went over take profit (side buy) for {ticker}.')
+                del orders[ticker]
+                continue
+
+            bid = 1.01 * base
+            side = OrderSide.BUY
+
+        qty = int(MAX_ORDER_CAPITAL / bid)
+
+        if qty == 0:
+            print(f'Bid qty was 0 (order capital too small) for {ticker}.')
             del orders[ticker]
             continue
 
-        bid = 1.01 * base
-        side = OrderSide.BUY
-
-    qty = int(MAX_ORDER_CAPITAL / bid)
-
-    if qty == 0:
-        print(f'Bid qty was 0 (order capital too small) for {ticker}.')
-        del orders[ticker]
-        continue
-
-    try:
-        alpaca_order = trading_client.submit_order(
-            LimitOrderRequest(
-                symbol=ticker,
-                qty=qty,
-                side=side,
-                time_in_force=TimeInForce.GTC,
-                limit_price=normalize_price(bid),
-                order_class=OrderClass.BRACKET,
-                take_profit=TakeProfitRequest(
-                    limit_price=normalize_price(take_profit)
-                ),
-                stop_loss=StopLossRequest(
-                    stop_price=normalize_price(stop_loss)
+        try:
+            alpaca_order = trading_client.submit_order(
+                LimitOrderRequest(
+                    symbol=ticker,
+                    qty=qty,
+                    side=side,
+                    time_in_force=TimeInForce.GTC,
+                    limit_price=normalize_price(bid),
+                    order_class=OrderClass.BRACKET,
+                    take_profit=TakeProfitRequest(
+                        limit_price=normalize_price(take_profit)
+                    ),
+                    stop_loss=StopLossRequest(
+                        stop_price=normalize_price(stop_loss)
+                    )
                 )
             )
-        )
-    except APIError as e:
-        # Insufficient funds error
-        if e.code == 40310000:
-            print('Insufficient funds, breaking.')
-            break
-        else:
+        except APIError as e:
+            # Insufficient funds error
+            if e.code == 40310000:
+                print('Insufficient funds, breaking.')
+                break
+            else:
+                print_and_send_error_notification(
+                    'something went wrong when submitting the order: '
+                    f'{traceback.format_exc()}'
+                )
+                del orders[ticker]
+                continue
+
+        except Exception:
             print_and_send_error_notification(
                 'something went wrong when submitting the order: '
                 f'{traceback.format_exc()}'
@@ -251,23 +257,20 @@ for ticker in list(orders.keys()):
             del orders[ticker]
             continue
 
-    except Exception:
-        print_and_send_error_notification(
-            'something went wrong when submitting the order: '
-            f'{traceback.format_exc()}'
-        )
+        if ticker not in ongoing_orders:
+            ongoing_orders[ticker] = {
+                'info': [],
+                side: order['take_stop_side'][2]
+            }
+
+        ongoing_orders[ticker]['info'].append([
+            order['date'], take_profit, str(alpaca_order.id)
+        ])
+
         del orders[ticker]
-        continue
-
-    if ticker not in ongoing_orders:
-        ongoing_orders[ticker] = {'info': [], side: order['take_stop_side'][2]}
-
-    ongoing_orders[ticker]['info'].append([
-        order['date'], take_profit, str(alpaca_order.id)
-    ])
-
-    del orders[ticker]
-    print(f'Completed order for {ticker}.')
+        print(f'Completed order for {ticker}.')
+else:
+    print('===No new orders===')
 
 print('===Removing no longer necessary orders===')
 market_open = trading_client.get_clock().is_open
