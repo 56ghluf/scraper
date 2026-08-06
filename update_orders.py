@@ -267,6 +267,7 @@ for ticker in list(orders.keys()):
     ])
 
     del orders[ticker]
+    print(f'Completed order for {ticker}.')
 
 print('===Removing no longer necessary orders===')
 market_open = trading_client.get_clock().is_open
