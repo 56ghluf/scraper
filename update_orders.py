@@ -308,8 +308,8 @@ for ticker in list(ongoing_orders.keys()):
 
         if bid_price >= order_info[1]:
             print(
-                f'{order_info[2]} passed over '
-                f'bid price ({bid_price}) for {ticker}.'
+                f'{order_info[2]} bid price ({bid_price}) went '
+                f'over take profit ({order_info[1]}) for {ticker}.'
             )
             trading_client.cancel_order_by_id(uuid.UUID(order_info[2]))
             continue
