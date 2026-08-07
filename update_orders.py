@@ -228,6 +228,8 @@ if len(orders) > 0:
             del orders[ticker]
             continue
 
+        remove_order = False
+
         try:
             alpaca_order = trading_client.submit_order(
                 LimitOrderRequest(
@@ -245,14 +247,15 @@ if len(orders) > 0:
                     )
                 )
             )
+
         except APIError as e:
             # Insufficient funds error
             if e.code == 40310000:
                 print_and_ntfy(f'Insufficient funds, breaking ({e.message}).')
                 break
-            elif e.code == 4221000:
+            elif e.code == 42210000:
                 print_and_ntfy_err(
-                    f'Order error: unprocessable ({e.message}).\n'
+                    f'Order was unprocessable ({e.message}):\n'
                     f'symbol={ticker}, qty={qty}, side={side}, '
                     f'time_in_force={TimeInForce.GTC}, '
                     f'limit_price={normalize_price(bid)}, '
@@ -260,21 +263,24 @@ if len(orders) > 0:
                     f'take_profit/limit_price={normalize_price(take_profit)}, '
                     f'stop_loss/stop_price={normalize_price(stop_loss)}'
                 )
-                del orders[ticker]
-                continue
+                remove_order = True
 
         except Exception:
             print_and_ntfy_err(
-                'Something went wrong when submitting the order: '
+                'Unknown error occured when submitting the order:'
                 f'{traceback.format_exc()}'
             )
+            remove_order = True
+
+        # Only time we leave order after error
+        if remove_order:
             del orders[ticker]
             continue
 
         if ticker not in ongoing_orders:
             ongoing_orders[ticker] = {
                 'info': [],
-                side: order['take_stop_side'][2]
+                'side': order['take_stop_side'][2]
             }
 
         ongoing_orders[ticker]['info'].append([
