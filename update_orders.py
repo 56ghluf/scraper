@@ -114,13 +114,20 @@ for row in new_data.to_dict('records'):
     )
 
 
-def print_and_send_error_notification(err_msg):
-    err_msg = '***ERR_MSG***\n' + err_msg
-    print(err_msg)
+def ntfy(msg):
     requests.post(
         'https://ntfy.sh/bDoZa0LEbwHCE0br',
-        data=err_msg
+        data=msg
     )
+
+
+def print_and_ntfy(msg):
+    print(msg)
+    ntfy(msg)
+
+
+def print_and_ntfy_err(err_msg):
+    print_and_ntfy('***ERR_MSG***\n' + err_msg)
 
 
 def normalize_price(price):
@@ -171,9 +178,9 @@ if len(orders) > 0:
         try:
             data = bar_data.loc[ticker]
         except KeyError:
-            print_and_send_error_notification(
-                f'failed to get stock data from alpaca for {ticker}:'
-                ' got KeyError'
+            print_and_ntfy(
+                'Failed to get stock data '
+                f'from alpaca for {ticker} (KeyError).'
             )
             del orders[ticker]
             continue
@@ -215,7 +222,9 @@ if len(orders) > 0:
         qty = int(MAX_ORDER_CAPITAL / bid)
 
         if qty == 0:
-            print(f'Bid qty was 0 (order capital too small) for {ticker}.')
+            print_and_ntfy(
+                f'Bid qty was 0 (order capital too small) for {ticker}.'
+            )
             del orders[ticker]
             continue
 
@@ -239,19 +248,24 @@ if len(orders) > 0:
         except APIError as e:
             # Insufficient funds error
             if e.code == 40310000:
-                print('Insufficient funds, breaking.')
+                print_and_ntfy(f'Insufficient funds, breaking ({e.message}).')
                 break
-            else:
-                print_and_send_error_notification(
-                    'something went wrong when submitting the order: '
-                    f'{traceback.format_exc()}'
+            elif e.code == 4221000:
+                print_and_ntfy_err(
+                    f'Order error: unprocessable ({e.message}).\n'
+                    f'symbol={ticker}, qty={qty}, side={side}, '
+                    f'time_in_force={TimeInForce.GTC}, '
+                    f'limit_price={normalize_price(bid)}, '
+                    f'order_class={OrderClass.BRACKET}, '
+                    f'take_profit/limit_price={normalize_price(take_profit)}, '
+                    f'stop_loss/stop_price={normalize_price(stop_loss)}'
                 )
                 del orders[ticker]
                 continue
 
         except Exception:
-            print_and_send_error_notification(
-                'something went wrong when submitting the order: '
+            print_and_ntfy_err(
+                'Something went wrong when submitting the order: '
                 f'{traceback.format_exc()}'
             )
             del orders[ticker]
