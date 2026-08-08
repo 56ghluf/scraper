@@ -46,10 +46,14 @@ def date_str_to_numeric(date_str):
     return 31*(int(date_str[5:7])-1) + int(date_str[8:10])
 
 
-# load a file content as str
 def file_to_str(filename):
     with open(filename, 'r', encoding='utf-8') as f:
         return f.read()
+
+
+def str_to_file(content, filename):
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write(content)
 
 
 def load_json(filename):
