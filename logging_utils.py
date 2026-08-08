@@ -23,7 +23,7 @@ class Logger:
 
         try:
             if (
-                dlus.file_to_str('logs/' + self.name).split('\n', 1)[1] 
+                dlus.file_to_str('logs/' + self.name).split('\n', 1)[1]
                 == joined_body
             ):
                 return
@@ -31,7 +31,11 @@ class Logger:
         except FileNotFoundError:
             pass
 
-        joined_body = f'===== {self.name} [{self.time}] =====\n' + joined_body
+        joined_body = (
+            f'===== {self.name} [{self.time}] =====\n'
+            + joined_body + f'>>> end {self.name} <<<\n'
+        )
+
         print(joined_body, end='')
 
         dlus.str_to_file(joined_body, 'logs/' + self.name)
