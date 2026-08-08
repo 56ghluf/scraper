@@ -145,7 +145,7 @@ data_client = StockHistoricalDataClient(ALPACA_KEY, ALPACA_SECRET)
 trading_client = TradingClient(ALPACA_KEY, ALPACA_SECRET)
 
 if len(orders) > 0:
-    logger.add('===Retrieving new order stock data===\n')
+    logger.add('Retrieving new order stock data\n')
 
     bar_request_params = StockBarsRequest(
         symbol_or_symbols=orders.keys(),
@@ -159,7 +159,7 @@ if len(orders) > 0:
 
     MAX_ORDER_CAPITAL = 500
 
-    logger.add('===Creating new orders===\n')
+    logger.add('Placing new orders.\n')
 
     for ticker in list(orders.keys()):
         order = orders[ticker]
@@ -294,7 +294,7 @@ if len(orders) > 0:
         del orders[ticker]
         logger.add(f'Completed order for {ticker}.\n')
 else:
-    logger.add('===No new orders===\n')
+    logger.add('No new orders.\n')
 
 logger.add('===Removing no longer necessary orders===\n')
 market_open = trading_client.get_clock().is_open
