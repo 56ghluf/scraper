@@ -20,6 +20,7 @@ from alpaca.data.requests import StockLatestQuoteRequest
 from alpaca.common.exceptions import APIError
 
 import data_loading_utils as dlus
+from logging_utils import Logger
 
 saved_state = dlus.load_json('curr_data/order_data.json')
 
@@ -67,7 +68,9 @@ def trade_too_old(date_str):
     return False
 
 
-print('===Create orders from new predictions===')
+logger = Logger('update_orders')
+
+logger.add('===Create orders from new predictions===\n')
 for row in new_data.to_dict('records'):
     index += 1
     if trade_too_old(row[dlus.TRADE_DATE_COL]):
@@ -87,9 +90,9 @@ for row in new_data.to_dict('records'):
         elif 'loss' in model_name and threshold > max_loss:
             max_loss = threshold
         elif not ('gain' in model_name or 'loss' in model_name):
-            print(
+            logger.add(
                 'fatal: there neither gain '
-                f'nor loss in model_name: {model_name}'
+                f'nor loss in model_name: {model_name}\n'
             )
 
     if max_gain <= 0 and max_loss > 0:
@@ -121,13 +124,13 @@ def ntfy(msg):
     )
 
 
-def print_and_ntfy(msg):
-    print(msg)
+def log_and_ntfy(msg):
+    logger.add(msg)
     ntfy(msg)
 
 
-def print_and_ntfy_err(err_msg):
-    print_and_ntfy('***ERR_MSG***\n' + err_msg)
+def log_and_ntfy_err(err_msg):
+    log_and_ntfy('***ERR_MSG***\n' + err_msg)
 
 
 def normalize_price(price):
@@ -142,7 +145,7 @@ data_client = StockHistoricalDataClient(ALPACA_KEY, ALPACA_SECRET)
 trading_client = TradingClient(ALPACA_KEY, ALPACA_SECRET)
 
 if len(orders) > 0:
-    print('===Retrieving new order stock data===')
+    logger.add('===Retrieving new order stock data===\n')
 
     bar_request_params = StockBarsRequest(
         symbol_or_symbols=orders.keys(),
@@ -156,38 +159,38 @@ if len(orders) > 0:
 
     MAX_ORDER_CAPITAL = 500
 
-    print('===Creating new orders===')
+    logger.add('===Creating new orders===\n')
 
     for ticker in list(orders.keys()):
         order = orders[ticker]
 
         if trade_too_old(order['date']):
-            print(f'Trade too old for {ticker}: {order['date']}')
+            logger.add(f'Trade too old for {ticker}: {order["date"]}\n')
             del orders[ticker]
             continue
 
         if ticker in ongoing_orders:
             if ongoing_orders[ticker]['side'] != order['take_stop_side'][2]:
-                print(
-                    f'Order on opposite side for {ticker}. Current',
-                    ongoing_orders[ticker]['side'],
-                    'new', order['take_stop_side'][2], '\b.'
+                logger.add(
+                    f'Order on opposite side for {ticker}. Current '
+                    + ongoing_orders[ticker]['side']
+                    + ' new ' + order['take_stop_side'][2] + '.\n'
                 )
                 continue
 
         try:
             data = bar_data.loc[ticker]
         except KeyError:
-            print_and_ntfy(
+            log_and_ntfy(
                 'Failed to get stock data '
-                f'from alpaca for {ticker} (KeyError).'
+                f'from alpaca for {ticker} (KeyError).\n'
             )
             del orders[ticker]
             continue
 
         base_idx = data.index.searchsorted(order['date'])
         if base_idx > len(data):
-            print(f'No market data for {ticker}.')
+            logger.add(f'No market data for {ticker}.\n')
             continue
 
         base = data.iloc[base_idx]['close']
@@ -201,7 +204,8 @@ if len(orders) > 0:
                 not pd.isna(following_closes.min()) and
                 following_closes.min() <= take_profit
             ):
-                print(f'Went under take profit (side sell) for {ticker}.')
+                logger.add(
+                    f'Went under take profit (side sell) for {ticker}.\n')
                 del orders[ticker]
                 continue
 
@@ -212,7 +216,7 @@ if len(orders) > 0:
                 not pd.isna(following_closes.max()) and
                 following_closes.max() >= take_profit
             ):
-                print(f'Went over take profit (side buy) for {ticker}.')
+                logger.add(f'Went over take profit (side buy) for {ticker}.\n')
                 del orders[ticker]
                 continue
 
@@ -222,8 +226,8 @@ if len(orders) > 0:
         qty = int(MAX_ORDER_CAPITAL / bid)
 
         if qty == 0:
-            print_and_ntfy(
-                f'Bid qty was 0 (order capital too small) for {ticker}.'
+            log_and_ntfy(
+                f'Bid qty was 0 (order capital too small) for {ticker}.\n'
             )
             del orders[ticker]
             continue
@@ -251,24 +255,24 @@ if len(orders) > 0:
         except APIError as e:
             # Insufficient funds error
             if e.code == 40310000:
-                print_and_ntfy(f'Insufficient funds, breaking ({e.message}).')
+                log_and_ntfy(f'Insufficient funds, breaking ({e.message}).\n')
                 break
             elif e.code == 42210000:
-                print_and_ntfy_err(
+                log_and_ntfy_err(
                     f'Order was unprocessable ({e.message}):\n'
                     f'symbol={ticker}, qty={qty}, side={side}, '
                     f'time_in_force={TimeInForce.GTC}, '
                     f'limit_price={normalize_price(bid)}, '
                     f'order_class={OrderClass.BRACKET}, '
                     f'take_profit/limit_price={normalize_price(take_profit)}, '
-                    f'stop_loss/stop_price={normalize_price(stop_loss)}'
+                    f'stop_loss/stop_price={normalize_price(stop_loss)}\n'
                 )
                 remove_order = True
 
         except Exception:
-            print_and_ntfy_err(
+            log_and_ntfy_err(
                 'Unknown error occured when submitting the order:'
-                f'{traceback.format_exc()}'
+                f'{traceback.format_exc()}\n'
             )
             remove_order = True
 
@@ -288,15 +292,15 @@ if len(orders) > 0:
         ])
 
         del orders[ticker]
-        print(f'Completed order for {ticker}.')
+        logger.add(f'Completed order for {ticker}.\n')
 else:
-    print('===No new orders===')
+    logger.add('===No new orders===\n')
 
-print('===Removing no longer necessary orders===')
+logger.add('===Removing no longer necessary orders===\n')
 market_open = trading_client.get_clock().is_open
 
 if not market_open:
-    print('Market is closed.')
+    logger.add('Market is closed.\n')
 
 for ticker in list(ongoing_orders.keys()):
     remaining_info = []
@@ -309,11 +313,11 @@ for ticker in list(ongoing_orders.keys()):
         )
 
         if updated_order.status == OrderStatus.FILLED:
-            print(f'{order_info[2]} filled for {ticker}.')
+            logger.add(f'{order_info[2]} filled for {ticker}.\n')
             continue
 
         if trade_too_old(order_info[0]):
-            print(f'{order_info[2]} too old for {ticker}.')
+            logger.add(f'{order_info[2]} too old for {ticker}.\n')
             trading_client.cancel_order_by_id(uuid.UUID(order_info[2]))
             continue
 
@@ -327,9 +331,9 @@ for ticker in list(ongoing_orders.keys()):
             )[ticker].bid_price
 
         if bid_price >= order_info[1]:
-            print(
+            logger.add(
                 f'{order_info[2]} bid price ({bid_price}) went '
-                f'over take profit ({order_info[1]}) for {ticker}.'
+                f'over take profit ({order_info[1]}) for {ticker}.\n'
             )
             trading_client.cancel_order_by_id(uuid.UUID(order_info[2]))
             continue
