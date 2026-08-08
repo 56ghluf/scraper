@@ -27,6 +27,8 @@ int main() {
   const std::string url{
       std::vformat(base_url, std::make_format_args(start_date, end_date))};
 
+  std::cout << "Get request: " << url << '\n';
+
   const cpr::Response r{cpr::Get(
       cpr::Url{url},
       cpr::Header{
