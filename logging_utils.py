@@ -19,7 +19,7 @@ class Logger:
         if len(self.body) == 0:
             return
 
-        joined_body = ''.join(self.body)
+        joined_body = ''.join(self.body) + f'>>> end {self.name} <<<\n'
 
         try:
             if (
@@ -33,7 +33,7 @@ class Logger:
 
         joined_body = (
             f'===== {self.name} [{self.time}] =====\n'
-            + joined_body + f'>>> end {self.name} <<<\n'
+            + joined_body
         )
 
         print(joined_body, end='')
@@ -43,5 +43,5 @@ class Logger:
 
 if __name__ == '__main__':
     logger = Logger('logging_utils')
-    logger.add('different stuff\n')
+    logger.add('differen stuff\n')
     logger.add('some more different stuff\n')
