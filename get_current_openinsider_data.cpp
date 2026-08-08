@@ -30,15 +30,16 @@ int main() {
   std::cout << "Get request: " << url << '\n';
 
   const cpr::Response r{cpr::Get(
-      cpr::Url{url},
-      cpr::Header{
-          {"User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) "
-                         "Gecko/20100101 Firefox/152.0"},
-          {"Accept",
-           "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
-          {"Accept-Language", "en-US,en;q=0.9"},
-          {"Accept-Encoding", "gzip, deflate"},
-          {"Connection", "keep-alive"}})};
+      cpr::Url{url} //,
+      //cpr::Header{
+          //{"User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) "
+                         //"Gecko/20100101 Firefox/152.0"},
+          //{"Accept",
+           //"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
+          //{"Accept-Language", "en-US,en;q=0.9"},
+          //{"Accept-Encoding", "gzip, deflate"},
+          //{"Connection", "keep-alive"}}
+  )};
 
   parse_table(r.text, out_file, true);
 }
