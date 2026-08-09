@@ -1,4 +1,5 @@
 import json
+import os
 
 # annoying column name constants
 FILING_DATE_COL = 'Filing\xA0Date'
@@ -64,3 +65,9 @@ def load_json(filename):
 def write_json(data, filename):
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
+
+
+def in_prod():
+    if 'DEV_ENV' in os.environ:
+        return False
+    return True
