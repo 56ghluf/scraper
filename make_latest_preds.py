@@ -1,11 +1,26 @@
 from os import listdir
 import requests
 import datetime
+import subprocess
 
 import pandas as pd
 from joblib import load
 
 import data_loading_utils as dlus
+from logging_utils import Logger
+
+logger = Logger('make_latest_preds')
+
+logger.add('Retrieving latest openinsider data.\n')
+
+get_latest_raw_data_out = subprocess.run(
+    ['./build/bin/get_current_openinsider_data'],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.STDOUT,
+    text=True
+).stdout
+
+logger.add(get_latest_raw_data_out)
 
 try:
     new_data = pd.read_csv('curr_data/raw_data.csv',
@@ -22,7 +37,7 @@ try:
                                        dlus.OWN_COL: dlus.own_to_float,
                                        'Value': dlus.price_to_float})
 except pd.errors.EmptyDataError:
-    print('no openinsider data available, quitting')
+    logger.add('No openinsider data availabe, quitting.\n')
     exit()
 
 new_data.dropna(subset=['Ticker'])

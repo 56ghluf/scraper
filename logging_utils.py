@@ -19,7 +19,7 @@ class Logger:
         if len(self.body) == 0:
             return
 
-        joined_body = ''.join(self.body) + f'>>> end {self.name} <<<\n\n'
+        joined_body = ''.join(self.body) + f'>>>>> end {self.name} <<<<<\n\n'
 
         try:
             if (
@@ -32,7 +32,7 @@ class Logger:
             pass
 
         joined_body = (
-            f'===== {self.name} [{self.time}] =====\n'
+            f'>>>>> {self.name} [{self.time}] <<<<<\n'
             + joined_body
         )
 
