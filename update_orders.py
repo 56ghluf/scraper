@@ -111,7 +111,7 @@ for row in new_data.to_dict('records'):
                 f'nor loss in model_name: {model_name}\n'
             )
 
-    if max_gain <= 0 and max_loss > 0:
+    if max_gain <= 0 and max_loss > 5:
         add_order(
             orders,
             row['Ticker'],
