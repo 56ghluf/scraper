@@ -308,7 +308,7 @@ if len(orders) > 0:
 
     MAX_ORDER_CAPITAL = 500
 
-    logger.add('===Placing new orders on alpaca.===\n')
+    logger.add('===Placing new orders on alpaca===\n')
 
     for ticker in list(orders.keys()):
         order = orders[ticker]
