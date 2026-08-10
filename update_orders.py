@@ -227,7 +227,7 @@ def get_bid_and_side(ticker, following_closes, take_profit, base):
             del orders[ticker]
             return (-1, -1, True)
 
-        return (0.99 * base, OrderSide.SELL, False)
+        return (0.998 * base, OrderSide.SELL, False)
 
     elif order['take_stop_side'][2] == 'buy':
         if (
@@ -238,7 +238,7 @@ def get_bid_and_side(ticker, following_closes, take_profit, base):
             del orders[ticker]
             return (-1, -1, True)
 
-        return (1.01 * base, OrderSide.BUY, False)
+        return (1.002 * base, OrderSide.BUY, False)
 
     else:
         logger.add('get_bid_and_side: fatal, order is neither sell nor buy.\n')
