@@ -366,12 +366,12 @@ if len(orders) > 0:
                 'side': order['take_stop_side'][2]
             }
 
-        ongoing_orders[ticker]['info'].append([
-            order['date'], take_profit, order_id
-        ])
+        order_info = [order['date'], take_profit, order_id]
+        ongoing_orders[ticker]['info'].append(order_info)
 
         del orders[ticker]
-        logger.add(f'Completed order for {ticker}.\n')
+        logger.add(
+            f'Completed order for {ticker} (limit at {bid}): {order_info}.\n')
 else:
     logger.add('No new orders.\n')
 
