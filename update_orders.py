@@ -218,16 +218,17 @@ def get_bid_and_side(ticker, following_closes, take_profit, base):
     order = orders[ticker]
 
     if order['take_stop_side'][2] == 'sell':
-        if (
-            not pd.isna(following_closes.min()) and
-            following_closes.min() <= take_profit
-        ):
-            logger.add(
-                f'Went under take profit (side sell) for {ticker}.\n')
-            del orders[ticker]
-            return (-1, -1, True)
+        return (-1, -1, True)
+        # if (
+        # not pd.isna(following_closes.min()) and
+        # following_closes.min() <= take_profit
+        # ):
+        # logger.add(
+        # f'Went under take profit (side sell) for {ticker}.\n')
+        # del orders[ticker]
+        # return (-1, -1, True)
 
-        return (0.998 * base, OrderSide.SELL, False)
+        # return (0.998 * base, OrderSide.SELL, False)
 
     elif order['take_stop_side'][2] == 'buy':
         if (
