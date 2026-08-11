@@ -446,7 +446,7 @@ for ticker in list(ongoing_orders.keys()):
         elif side == 'sell' and price <= order_info[1]:
             logger.add(
                 f'{order_info[2]} ask price ({price}) went '
-                f'over take profit ({order_info[1]}) for {ticker}.\n'
+                f'under take profit ({order_info[1]}) for {ticker}.\n'
             )
             cancel_order(order_info)
             continue
