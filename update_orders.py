@@ -38,6 +38,23 @@ if not dlus.in_prod():
     logger.add('*****DEVELOPPEMENT ENVIRONMENT*****\n')
 
 
+def ntfy(msg):
+    if dlus.in_prod():
+        requests.post(
+            'https://ntfy.sh/bDoZa0LEbwHCE0br',
+            data=msg
+        )
+
+
+def log_and_ntfy(msg):
+    logger.add(msg)
+    ntfy(msg)
+
+
+def log_and_ntfy_err(err_msg):
+    log_and_ntfy('***ERR_MSG***\n' + err_msg)
+
+
 def add_order(orders, ticker, take_stop_side, date):
     new_order = {'take_stop_side': take_stop_side, 'date': date}
 
@@ -49,11 +66,13 @@ def add_order(orders, ticker, take_stop_side, date):
     if orders[ticker]['take_stop_side'][2] == 'sell':
         if take_stop_side[2] == 'buy':
             logger.add(
-                f'add_order [{ticker}]: replaced {orders[ticker]} with {new_order}.\n')
+                f'add_order [{ticker}]: '
+                f'replaced {orders[ticker]} with {new_order}.\n')
             orders[ticker] = new_order
         elif orders[ticker]['take_stop_side'][0] > take_stop_side[0]:
             logger.add(
-                f'add_order [{ticker}]: replaced {orders[ticker]} with {new_order}.\n')
+                f'add_order [{ticker}]: '
+                f'replaced {orders[ticker]} with {new_order}.\n')
             orders[ticker] = new_order
         return
 
@@ -106,7 +125,7 @@ for row in new_data.to_dict('records'):
         elif 'loss' in model_name and threshold > max_loss:
             max_loss = threshold
         elif not ('gain' in model_name or 'loss' in model_name):
-            logger.add(
+            log_and_ntfy_err(
                 'fatal: there neither gain '
                 f'nor loss in model_name: {model_name}\n'
             )
@@ -133,23 +152,6 @@ for row in new_data.to_dict('records'):
         take_stop_side,
         row[dlus.TRADE_DATE_COL]
     )
-
-
-def ntfy(msg):
-    if dlus.in_prod():
-        requests.post(
-            'https://ntfy.sh/bDoZa0LEbwHCE0br',
-            data=msg
-        )
-
-
-def log_and_ntfy(msg):
-    logger.add(msg)
-    ntfy(msg)
-
-
-def log_and_ntfy_err(err_msg):
-    log_and_ntfy('***ERR_MSG***\n' + err_msg)
 
 
 def normalize_price(price):
@@ -218,31 +220,34 @@ def get_bid_and_side(ticker, following_closes, take_profit, base):
     order = orders[ticker]
 
     if order['take_stop_side'][2] == 'sell':
-        return (-1, -1, True)
-        # if (
-        # not pd.isna(following_closes.min()) and
-        # following_closes.min() <= take_profit
-        # ):
-        # logger.add(
-        # f'Went under take profit (side sell) for {ticker}.\n')
-        # del orders[ticker]
-        # return (-1, -1, True)
+        if (
+            not pd.isna(following_closes.min()) and
+            following_closes.min() <= take_profit
+        ):
+            logger.add(
+                f'Went under take profit {take_profit} '
+                f'(side sell) for {ticker}.\n')
+            del orders[ticker]
+            return (-1, -1, True)
 
-        # return (0.998 * base, OrderSide.SELL, False)
+        return (0.998 * base, OrderSide.SELL, False)
 
     elif order['take_stop_side'][2] == 'buy':
         if (
             not pd.isna(following_closes.max()) and
             following_closes.max() >= take_profit
         ):
-            logger.add(f'Went over take profit (side buy) for {ticker}.\n')
+            logger.add(
+                f'Went over take profit {take_profit} '
+                f'(side buy) for {ticker}.\n')
             del orders[ticker]
             return (-1, -1, True)
 
         return (1.002 * base, OrderSide.BUY, False)
 
     else:
-        logger.add('get_bid_and_side: fatal, order is neither sell nor buy.\n')
+        log_and_ntfy_err(
+            'get_bid_and_side: fatal, order is neither sell nor buy.')
         return (-1, -1, True)
 
 
@@ -307,7 +312,9 @@ def place_order(ticker, qty, side, bid, take_profit, stop_loss):
 if len(orders) > 0:
     bar_data = get_latest_bar_data()
 
-    MAX_ORDER_CAPITAL = 500
+    equity = float(trading_client.get_account().equity)
+
+    order_amount = max(100, 0.01*equity)
 
     logger.add('===Placing new orders on alpaca===\n')
 
@@ -342,7 +349,7 @@ if len(orders) > 0:
         if should_continue:
             continue
 
-        qty = int(MAX_ORDER_CAPITAL / bid)
+        qty = int(order_amount / bid)
 
         if qty == 0:
             log_and_ntfy(
@@ -378,9 +385,7 @@ else:
 
 
 def cancel_order(order_info):
-    if not dlus.in_prod():
-        return
-
+    if dlus.in_prod():
         trading_client.cancel_order_by_id(uuid.UUID(order_info[2]))
 
 
@@ -391,9 +396,11 @@ if not market_open:
     logger.add('Market is closed.\n')
 
 for ticker in list(ongoing_orders.keys()):
+    side = ongoing_orders[ticker]['side']
+
     remaining_info = []
 
-    bid_price = None
+    price = None
 
     for order_info in ongoing_orders[ticker]['info']:
         if dlus.in_prod():
@@ -414,14 +421,31 @@ for ticker in list(ongoing_orders.keys()):
             remaining_info.append(order_info)
             continue
 
-        if bid_price is None:
-            bid_price = data_client.get_stock_latest_quote(
+        if price is None:
+            latest_quote = data_client.get_stock_latest_quote(
                 StockLatestQuoteRequest(symbol_or_symbols=ticker)
-            )[ticker].bid_price
+            )[ticker]
 
-        if bid_price >= order_info[1]:
+            if side == 'buy':
+                price = latest_quote.bid_price
+            elif side == 'sell':
+                price = latest_quote.ask_price
+            else:
+                log_and_ntfy_err(
+                    'get_bid_and_side: fatal, order is neither sell nor buy.\n'
+                )
+
+        if side == 'buy' and price >= order_info[1]:
             logger.add(
-                f'{order_info[2]} bid price ({bid_price}) went '
+                f'{order_info[2]} bid price ({price}) went '
+                f'over take profit ({order_info[1]}) for {ticker}.\n'
+            )
+            cancel_order(order_info)
+            continue
+
+        elif side == 'sell' and price <= order_info[1]:
+            logger.add(
+                f'{order_info[2]} ask price ({price}) went '
                 f'over take profit ({order_info[1]}) for {ticker}.\n'
             )
             cancel_order(order_info)
