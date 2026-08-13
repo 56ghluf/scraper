@@ -99,7 +99,7 @@ def trade_too_old(date_str):
     if (
         datetime.date.today() -
         datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-    ).days > 9:
+    ).days > 5:
         return True
 
     return False
@@ -115,7 +115,7 @@ for row in new_data.to_dict('records'):
     max_loss = -1
 
     for model_name in model_names:
-        if not row[model_name] or pd.isna(row[model_name]):
+        if pd.isna(row[model_name]) or not row[model_name]:
             continue
 
         threshold = int(re.search(r'thld(\d+)', model_name).group(1))
@@ -130,7 +130,10 @@ for row in new_data.to_dict('records'):
                 f'nor loss in model_name: {model_name}\n'
             )
 
-    if max_gain <= 0 and max_loss > 5:
+    if max_gain > 0 and max_loss > 0:
+        continue
+
+    if max_loss > 10:
         add_order(
             orders,
             row['Ticker'],
@@ -139,12 +142,10 @@ for row in new_data.to_dict('records'):
         )
         continue
 
-    if max_gain <= max_loss:
+    if max_gain < 0:
         continue
 
-    max_loss = max(max_loss, 0) + 5
-
-    take_stop_side = [1+max_gain/100, 1-max_loss/100, 'buy']
+    take_stop_side = [1.05, 0.95, 'buy']
 
     add_order(
         orders,
