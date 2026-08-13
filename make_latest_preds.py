@@ -98,7 +98,7 @@ for row in new_data.to_dict('records'):
     if (
         datetime.date.today() -
         datetime.datetime.strptime(row[dlus.TRADE_DATE_COL], '%Y-%m-%d').date()
-    ).days > 9:
+    ).days > 5:
         continue
 
     match = {}

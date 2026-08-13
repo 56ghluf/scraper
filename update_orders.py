@@ -231,7 +231,7 @@ def get_bid_and_side(ticker, following_closes, take_profit, base):
             del orders[ticker]
             return (-1, -1, True)
 
-        return (0.998 * base, OrderSide.SELL, False)
+        return (0.999 * base, OrderSide.SELL, False)
 
     elif order['take_stop_side'][2] == 'buy':
         if (
@@ -244,7 +244,7 @@ def get_bid_and_side(ticker, following_closes, take_profit, base):
             del orders[ticker]
             return (-1, -1, True)
 
-        return (1.002 * base, OrderSide.BUY, False)
+        return (1.001 * base, OrderSide.BUY, False)
 
     else:
         log_and_ntfy_err(
