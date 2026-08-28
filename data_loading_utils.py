@@ -52,8 +52,9 @@ def file_to_str(filename):
         return f.read()
 
 
-def str_to_file(content, filename):
-    with open(filename, 'w', encoding='utf-8') as f:
+def str_to_file(content, filename, append=False):
+    mode = 'a' if append else 'w'
+    with open(filename, mode, encoding='utf-8') as f:
         f.write(content)
 
 
