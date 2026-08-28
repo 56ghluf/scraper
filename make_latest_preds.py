@@ -144,7 +144,7 @@ for match in matches:
     request_data += '\n'
 
 if request_data != '':
-    request_data = 44*'-' + '\n\n' + request_data + '\n' + 44*'-'
+    request_data = 44*'-' + '\n\n' + request_data + 44*'-'
     requests.post(
         'https://ntfy.sh/bDoZa0LEbwHCE0br',
         data=request_data

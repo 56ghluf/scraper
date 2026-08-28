@@ -137,22 +137,20 @@ for row in new_data.to_dict('records'):
         add_order(
             orders,
             row['Ticker'],
-            [0.95, 1.05, 'sell'],
+            [0.94, 1.05, 'sell'],
             row[dlus.TRADE_DATE_COL]
         )
         continue
 
-    if max_gain < 0:
-        continue
+    if max_gain > 10:
+        take_stop_side = [1.06, 0.95, 'buy']
 
-    take_stop_side = [1.05, 0.95, 'buy']
-
-    add_order(
-        orders,
-        row['Ticker'],
-        take_stop_side,
-        row[dlus.TRADE_DATE_COL]
-    )
+        add_order(
+            orders,
+            row['Ticker'],
+            take_stop_side,
+            row[dlus.TRADE_DATE_COL]
+        )
 
 
 def normalize_price(price):
@@ -231,7 +229,7 @@ def get_bid_and_side(ticker, following_closes, take_profit, base):
             del orders[ticker]
             return (-1, -1, True)
 
-        return (0.999 * base, OrderSide.SELL, False)
+        return (0.998 * base, OrderSide.SELL, False)
 
     elif order['take_stop_side'][2] == 'buy':
         if (
@@ -244,7 +242,7 @@ def get_bid_and_side(ticker, following_closes, take_profit, base):
             del orders[ticker]
             return (-1, -1, True)
 
-        return (1.001 * base, OrderSide.BUY, False)
+        return (1.002 * base, OrderSide.BUY, False)
 
     else:
         log_and_ntfy_err(
@@ -315,7 +313,7 @@ if len(orders) > 0:
 
     equity = float(trading_client.get_account().equity)
 
-    order_amount = max(100, 0.01*equity)
+    order_amount = max(100, 0.1*equity)
 
     logger.add('===Placing new orders on alpaca===\n')
 
