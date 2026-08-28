@@ -99,7 +99,7 @@ def trade_too_old(date_str):
     if (
         datetime.date.today() -
         datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-    ).days > 5:
+    ).days > 3:
         return True
 
     return False
